@@ -1,0 +1,6 @@
+discord.py
+asyncpg
+python-dotenv
+pillow
+fastapi
+uvicorn
