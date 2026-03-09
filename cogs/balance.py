@@ -157,16 +157,4 @@ class BalanceCog(commands.Cog):
 # Cog登録
 # =========================
 async def setup(bot):
-
-    cog = BalanceCog(bot)
-    await bot.add_cog(cog)
-
-    bot.tree.add_command(
-        cog.balance,
-        guild=discord.Object(id=GUILD_ID)
-    )
-
-    bot.tree.add_command(
-        cog.pay,
-        guild=discord.Object(id=GUILD_ID)
-    )
+    await bot.add_cog(BalanceCog(bot))
