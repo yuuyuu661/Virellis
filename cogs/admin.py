@@ -201,21 +201,5 @@ class AdminCog(commands.Cog):
 
 
 async def setup(bot):
-
-    cog = AdminCog(bot)
-    await bot.add_cog(cog)
-
-    bot.tree.add_command(
-        cog.set_balance,
-        guild=discord.Object(id=GUILD_ID)
-    )
-
-    bot.tree.add_command(
-        cog.ranking,
-        guild=discord.Object(id=GUILD_ID)
-    )
-
-    bot.tree.add_command(
-        cog.role_pay,
-        guild=discord.Object(id=GUILD_ID)
-    )
+    await bot.add_cog(AdminCog(bot))
+    
