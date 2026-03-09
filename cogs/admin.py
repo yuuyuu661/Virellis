@@ -1,283 +1,221 @@
-# cogs/admin.py
 import discord
 from discord.ext import commands
 from discord import app_commands
 
-from logger import log_manage
-from paginator import Paginator
+GUILD_ID = 1475448864122208350
 
 
 class AdminCog(commands.Cog):
+
     def __init__(self, bot):
         self.bot = bot
 
-    # --------------------------
-    # /残高設定（ギルド別）
-    # --------------------------
-    @app_commands.command(
-        name="残高設定",
-        description="ユーザーの残高を設定・増加・減少（管理者）"
-    )
+
+    # =========================
+    # 権限チェック
+    # =========================
+    async def check_admin(self, interaction):
+
+        guild_id = str(interaction.guild.id)
+        settings = await self.bot.db.get_settings(guild_id)
+
+        if not settings:
+            return False
+
+        admin_roles = settings["admin_roles"] or []
+        bank_roles = settings["bank_roles"] or []
+
+        user_roles = [str(r.id) for r in interaction.user.roles]
+
+        if any(r in admin_roles for r in user_roles):
+            return True
+
+        if any(r in bank_roles for r in user_roles):
+            return True
+
+        return False
+
+
+    # =========================
+    # 残高設定
+    # =========================
+    @app_commands.command(name="残高設定", description="ユーザーの残高を変更します")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def set_balance(
         self,
         interaction: discord.Interaction,
-        user: discord.User,
-        amount: int,
-        mode: str
+        user: discord.Member,
+        金額: int,
+        操作: str
     ):
 
-        settings = await self.bot.db.get_settings()
-        admin_roles = settings["admin_roles"] or []
-        unit = settings["currency_unit"]
+        if not await self.check_admin(interaction):
 
-        # 管理者ロールチェック
-        if not any(str(r.id) in admin_roles for r in interaction.user.roles):
             return await interaction.response.send_message(
-                "❌ 管理者ロールが必要です。",
+                "❌ 権限がありません。",
                 ephemeral=True
             )
 
+        guild_id = str(interaction.guild.id)
         uid = str(user.id)
+
+        if 操作 == "設定":
+
+            await self.bot.db.set_balance(uid, guild_id, 金額)
+
+        elif 操作 == "増加":
+
+            await self.bot.db.add_balance(uid, guild_id, 金額)
+
+        elif 操作 == "減少":
+
+            await self.bot.db.remove_balance(uid, guild_id, 金額)
+
+        else:
+
+            return await interaction.response.send_message(
+                "操作は 設定 / 増加 / 減少 のみです",
+                ephemeral=True
+            )
+
+        balance = await self.bot.db.get_balance(uid, guild_id)
+
+        embed = discord.Embed(
+            title="💰 残高変更",
+            color=0x3498db
+        )
+
+        embed.add_field(name="ユーザー", value=user.mention, inline=False)
+        embed.add_field(name="操作", value=操作, inline=True)
+        embed.add_field(name="金額", value=f"{金額:,}", inline=True)
+        embed.add_field(name="現在残高", value=f"{balance:,}", inline=False)
+
+        await interaction.response.send_message(embed=embed)
+
+
+    # =========================
+    # 残高ランキング
+    # =========================
+    @app_commands.command(name="残高一覧", description="サーバーの残高ランキング")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
+    async def ranking(self, interaction: discord.Interaction):
+
+        if not await self.check_admin(interaction):
+
+            return await interaction.response.send_message(
+                "❌ 権限がありません。",
+                ephemeral=True
+            )
+
         guild_id = str(interaction.guild.id)
 
-        # 操作モード分岐
-        if mode == "設定":
-            await self.bot.db.set_balance(uid, guild_id, amount)
-        elif mode == "増加":
-            await self.bot.db.add_balance(uid, guild_id, amount)
-        elif mode == "減少":
-            await self.bot.db.remove_balance(uid, guild_id, amount)
-        else:
+        rows = await self.bot.db.get_ranking(guild_id)
+
+        if not rows:
+
             return await interaction.response.send_message(
-                "モードは 設定 / 増加 / 減少 から選んでください。",
-                ephemeral=True
+                "データがありません"
             )
 
-        # 新しい残高を取得
-        new_bal = (await self.bot.db.get_user(uid, guild_id))["balance"]
-
-        # ログ処理
-        await log_manage(
-            self.bot,
-            settings,
-            str(interaction.user.id),
-            uid,
-            mode,
-            amount,
-            new_bal
+        embed = discord.Embed(
+            title="💰 残高ランキング",
+            color=0xf1c40f
         )
 
-        # 返答 → 実行者のみ
-        await interaction.response.send_message(
-            f"📝 <@{uid}> の残高を **{mode}** しました。\n"
-            f"現在：**{new_bal}{unit}**",
-            ephemeral=True
-        )
+        text = ""
 
-    # ------------------------------------------------------
-    # /ロール送金（送金・引き落とし共通）
-    # ------------------------------------------------------
-    @app_commands.command(
-        name="ロール送金",
-        description="指定ロールを持つ全メンバーに一括送金または引き落としを行います（管理者）"
-    )
-    @app_commands.choices(
-        action=[
-            app_commands.Choice(name="送金", value="pay"),
-            app_commands.Choice(name="引き落とし", value="deduct"),
-        ]
-    )
+        for i, r in enumerate(rows[:20], start=1):
+
+            member = interaction.guild.get_member(int(r["user_id"]))
+
+            if member:
+                name = member.display_name
+            else:
+                name = r["user_id"]
+
+            text += f"{i}. {name} — {r['balance']:,}\n"
+
+        embed.description = text
+
+        await interaction.response.send_message(embed=embed)
+
+
+    # =========================
+    # ロール送金
+    # =========================
+    @app_commands.command(name="ロール送金", description="ロール所持者に一括送金")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def role_pay(
         self,
         interaction: discord.Interaction,
         role: discord.Role,
-        action: app_commands.Choice[str],
-        amount: int
+        金額: int,
+        操作: str
     ):
-        settings = await self.bot.db.get_settings()
-        admin_roles = settings["admin_roles"] or []
-        unit = settings["currency_unit"]
 
-        # 管理者チェック
-        if not any(str(r.id) in admin_roles for r in interaction.user.roles):
+        if not await self.check_admin(interaction):
+
             return await interaction.response.send_message(
-                "❌ このコマンドを実行する権限がありません。",
+                "❌ 権限がありません。",
                 ephemeral=True
             )
 
-        if amount <= 0:
-            return await interaction.response.send_message(
-                "❌ 金額は1以上で指定してください。",
-                ephemeral=True
-            )
+        guild_id = str(interaction.guild.id)
 
-        guild = interaction.guild
-        guild_id = str(guild.id)
-
-        # サブ垢ロール取得（ホテル設定）
-        sub_role_id = await self.bot.db.get_hotel_sub_role(guild_id)
-        sub_role = guild.get_role(int(sub_role_id)) if sub_role_id else None
-
-        # 対象メンバー抽出
         members = [
-            m for m in guild.members
-            if role in m.roles
-            and not m.bot
-            and not (sub_role and sub_role in m.roles)
+            m for m in interaction.guild.members
+            if role in m.roles and not m.bot
         ]
 
-        if not members:
-            return await interaction.response.send_message(
-                "⚠ 対象ユーザーがいません。",
-                ephemeral=True
-            )
+        count = 0
 
-        # -----------------------
-        # 処理本体
-        # -----------------------
-        success_members = []
-        lack_members = []
+        for m in members:
 
-        if action.value == "pay":
-            # 送金は全員OK
-            for member in members:
-                await self.bot.db.add_balance(str(member.id), guild_id, amount)
-                success_members.append(member)
+            uid = str(m.id)
 
-            verb = "送金"
-            sign = "+"
+            if 操作 == "増加":
 
-        else:  # deduct
-            for member in members:
-                user = await self.bot.db.get_user(str(member.id), guild_id)
-                balance = user["balance"]
+                await self.bot.db.add_balance(uid, guild_id, 金額)
 
-                if balance < amount:
-                    lack_members.append(member)
-                    continue
+            elif 操作 == "減少":
 
-                await self.bot.db.add_balance(str(member.id), guild_id, -amount)
-                success_members.append(member)
+                await self.bot.db.remove_balance(uid, guild_id, 金額)
 
-            verb = "引き落とし"
-            sign = "-"
+            else:
 
-        total = amount * len(success_members)
+                continue
 
-        # -----------------------
-        # メッセージ生成
-        # -----------------------
-        msg = (
-            f"💰 ロール **{role.name}** を持つ **{len(success_members)}名** に対して\n"
-            f"**{verb}** を実行しました。\n"
-            f"金額：**{sign}{amount}{unit}** × {len(success_members)}人\n"
-            f"合計：**{sign}{total}{unit}**"
+            count += 1
+
+        embed = discord.Embed(
+            title="💸 ロール送金",
+            color=0xe67e22
         )
 
-        if lack_members:
-            mentions = " ".join(m.mention for m in lack_members)
-            msg += (
-                f"\n\n⚠ **残高不足のため処理できなかったユーザー**\n"
-                f"{mentions}"
-            )
+        embed.add_field(name="対象ロール", value=role.mention, inline=False)
+        embed.add_field(name="操作", value=操作, inline=True)
+        embed.add_field(name="金額", value=f"{金額:,}", inline=True)
+        embed.add_field(name="対象人数", value=count, inline=False)
 
-        await interaction.response.send_message(msg)
-    # --------------------------
-    # /残高一覧（ギルド別）
-    # --------------------------
-    @app_commands.command(
-        name="残高一覧",
-        description="全ユーザーの残高を上位順に表示します（管理者限定）"
-    )
-    async def balance_list(self, interaction: discord.Interaction):
-
-        # 設定取得
-        settings = await self.bot.db.get_settings()
-        admin_roles = settings["admin_roles"] or []
-        unit = settings["currency_unit"]
-
-        # 管理者ロールチェック（サーバー管理者 or admin_roles）
-        is_admin_role = any(str(r.id) in admin_roles for r in interaction.user.roles)
-        if not (interaction.user.guild_permissions.administrator or is_admin_role):
-            return await interaction.response.send_message(
-                "❌ 管理者ロールが必要です。",
-                ephemeral=True
-            )
-
-        guild = interaction.guild
-        if guild is None:
-            return await interaction.response.send_message(
-                "サーバー内でのみ使用できます。",
-                ephemeral=True
-            )
-
-        guild_id = str(guild.id)
-        rows = await self.bot.db.get_all_balances(guild_id)
-
-        if not rows:
-            embed = discord.Embed(
-                title="💰 残高一覧（上位順）",
-                description="データがありません。",
-                color=0xf1c40f
-            )
-            return await interaction.response.send_message(
-                embed=embed,
-                ephemeral=True
-            )
-
-        # 残高でソート（降順）
-        rows.sort(key=lambda r: r["balance"], reverse=True)
-
-        # 1ページあたりの件数
-        per_page = 10
-        total = len(rows)
-        page_count = (total + per_page - 1) // per_page
-
-        pages: list[discord.Embed] = []
-
-        for page_index in range(page_count):
-            start = page_index * per_page
-            end = start + per_page
-            chunk = rows[start:end]
-
-            lines = []
-            for i, r in enumerate(chunk, start=start + 1):
-                lines.append(f"{i}. <@{r['user_id']}>：**{r['balance']}{unit}**")
-
-            embed = discord.Embed(
-                title="💰 残高一覧（上位順）",
-                description="\n".join(lines),
-                color=0xf1c40f
-            )
-            embed.set_footer(
-                text=f"ページ {page_index + 1}/{page_count} | ユーザー数: {total}"
-            )
-            pages.append(embed)
-
-        # ページ数に応じて出し分け
-        if len(pages) == 1:
-            # 1ページだけなら普通に送信（エフェメラル）
-            await interaction.response.send_message(
-                embed=pages[0],
-                ephemeral=True
-            )
-        else:
-            # 複数ページなら Paginator を使う（エフェメラル）
-            view = Paginator(pages)
-            await interaction.response.send_message(
-                embed=pages[0],
-                view=view,
-                ephemeral=True
-            )
+        await interaction.response.send_message(embed=embed)
 
 
-# --------------------------
-# setup（必須）
-# --------------------------
 async def setup(bot):
+
     cog = AdminCog(bot)
     await bot.add_cog(cog)
 
-    for cmd in cog.get_app_commands():
-        for gid in bot.GUILD_IDS:
-            bot.tree.add_command(cmd, guild=discord.Object(id=gid))
+    bot.tree.add_command(
+        cog.set_balance,
+        guild=discord.Object(id=GUILD_ID)
+    )
+
+    bot.tree.add_command(
+        cog.ranking,
+        guild=discord.Object(id=GUILD_ID)
+    )
+
+    bot.tree.add_command(
+        cog.role_pay,
+        guild=discord.Object(id=GUILD_ID)
+    )
