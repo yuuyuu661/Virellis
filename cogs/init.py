@@ -79,13 +79,6 @@ class InitCog(commands.Cog):
 # =========================
 # Cog登録
 # =========================
+
 async def setup(bot):
-
-    cog = InitCog(bot)
-    await bot.add_cog(cog)
-
-    # ギルドコマンド登録
-    bot.tree.add_command(
-        cog.init_system,
-        guild=discord.Object(id=1475448864122208350)
-    )
+    await bot.add_cog(InitCog(bot))
