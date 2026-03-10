@@ -41,7 +41,7 @@ class CheckinButton(discord.ui.Button):
 
             # VCが存在しない場合は孤児データ削除
             if vc is None:
-                await bot.db.delete_room(room["vc_id"])
+                await bot.db.delete_room(room["text_id"])
             else:
                 return await interaction.followup.send(
                     "⚠ すでにホテルルームを所持しています。",
@@ -51,7 +51,7 @@ class CheckinButton(discord.ui.Button):
         tickets = await bot.db.get_tickets(user_id, guild_id)
 
         if tickets <= 0:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "ホテルチケットがありません。",
                 ephemeral=True
             )
@@ -60,7 +60,7 @@ class CheckinButton(discord.ui.Button):
         category = interaction.guild.get_channel(int(category_id))
 
         if not category:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "カテゴリーが見つかりません。",
                 ephemeral=True
             )
@@ -81,7 +81,7 @@ class CheckinButton(discord.ui.Button):
             color=0x2ecc71
         )
 
-        await interaction.channel.send(
+        await text_channel.send(
             embed=embed,
             view=RoomView()
         )
@@ -499,6 +499,11 @@ class RenameButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
 
         room = await interaction.client.db.get_room(str(interaction.channel.id))
+        if not room:
+            return await interaction.response.send_message(
+                "ホテルルームではありません",
+                ephemeral=True
+            )
 
         if str(interaction.user.id) != room["owner_id"]:
             return await interaction.response.send_message(
@@ -644,6 +649,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
