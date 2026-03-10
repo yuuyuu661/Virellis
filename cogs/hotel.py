@@ -561,7 +561,7 @@ class HotelCog(commands.Cog):
 
                 channel = guild.get_channel(int(room["vc_id"]))
                 if not channel:
-                    await self.bot.db.delete_room(room["vc_id"])
+                    await self.bot.db.delete_room(room["text_id"])
                     continue
 
                 if channel:
@@ -570,7 +570,7 @@ class HotelCog(commands.Cog):
                     except Exception as e:
                         print("room delete error", e)
 
-                await self.bot.db.delete_room(room["vc_id"])
+                await self.bot.db.delete_room(room["text_id"])
 
 
     # =========================
@@ -649,6 +649,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
