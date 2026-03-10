@@ -164,7 +164,15 @@ class Database:
     # =========================
     # 設定保存
     # =========================
-    async def set_settings(self, guild_id, admin_roles, bank_roles, hotel_role, sub_role):
+    async def set_settings(
+        self,
+        guild_id,
+        admin_roles,
+        bank_roles,
+        hotel_role,
+        sub_role,
+        currency_unit
+    ):
 
         await self._execute("""
         INSERT INTO settings(guild_id,admin_roles,bank_roles,hotel_role,sub_role)
