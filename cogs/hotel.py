@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-
+GUILD_ID = 1475448864122208350
 
 class CheckinButton(discord.ui.Button):
 
@@ -187,6 +187,7 @@ class HotelCog(commands.Cog):
     # ホテル初期設定
     # =========================
     @app_commands.command(name="ホテル初期設定")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def hotel_setup(
         self,
         interaction: discord.Interaction,
@@ -217,6 +218,7 @@ class HotelCog(commands.Cog):
     # ホテルパネル設置
     # =========================
     @app_commands.command(name="ホテルパネル設置")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def hotel_panel(
         self,
         interaction: discord.Interaction,
@@ -240,6 +242,7 @@ class HotelCog(commands.Cog):
     # チケット枚数確認
     # =========================
     @app_commands.command(name="ホテルチケット枚数確認")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def ticket_check(self, interaction: discord.Interaction):
 
         guild_id = str(interaction.guild.id)
@@ -254,4 +257,5 @@ class HotelCog(commands.Cog):
 
 
 async def setup(bot):
+
     await bot.add_cog(HotelCog(bot))
