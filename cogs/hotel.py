@@ -28,6 +28,17 @@ class CheckinButton(discord.ui.Button):
                 ephemeral=True
             )
 
+        # -----------------------------
+        # 同時チェックイン防止
+        # -----------------------------
+        room = await bot.db.get_room_by_owner(user_id, guild_id)
+
+        if room:
+            return await interaction.response.send_message(
+                "⚠ すでにホテルルームを所持しています。",
+                ephemeral=True
+            )
+
         tickets = await bot.db.get_tickets(user_id, guild_id)
 
         if tickets <= 0:
@@ -61,7 +72,7 @@ class CheckinButton(discord.ui.Button):
             color=0x2ecc71
         )
 
-        await text_channel.send(
+        await vc.send(
             embed=embed,
             view=RoomView()
         )
@@ -442,6 +453,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
