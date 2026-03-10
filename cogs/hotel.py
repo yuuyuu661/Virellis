@@ -240,6 +240,20 @@ class ExtendButton(discord.ui.Button):
 
         await bot.db.remove_tickets(user_id, guild_id, 1)
 
+        expire = room["expire_at"]
+
+        if not expire:
+            expire = datetime.utcnow()
+
+        new_expire = expire + timedelta(hours=24)
+
+        await bot.db.save_room(
+            str(interaction.channel.id),
+            guild_id,
+            user_id,
+            new_expire
+        )
+
         await interaction.response.send_message(
             "🏨 24時間延長しました",
             ephemeral=True
@@ -311,8 +325,6 @@ class TimeButton(discord.ui.Button):
             f"⏰ 残り {hours}時間 {minutes}分",
             ephemeral=True
         )
-@tasks.loop(minutes=1)
-async def room_checker(self):
 
     rooms = await self.bot.db.get_all_rooms()
 
@@ -342,51 +354,7 @@ async def room_checker(self):
 
             await self.bot.db.delete_room(room["channel_id"])
 
-class HotelCog(commands.Cog):
 
-    def __init__(self, bot):
-        self.bot = bot
-        self.room_checker.start()
-
-    # =========================
-    # ルーム期限チェック
-    # =========================
-    @tasks.loop(minutes=1)
-    async def room_checker(self):
-
-        rooms = await self.bot.db.get_all_rooms()
-
-        now = datetime.utcnow()
-
-        for room in rooms:
-
-            expire = room["expire_at"]
-
-            if not expire:
-                continue
-
-            if now >= expire:
-
-                guild = self.bot.get_guild(int(room["guild_id"]))
-                if not guild:
-                    continue
-
-                channel = guild.get_channel(int(room["channel_id"]))
-
-                if channel:
-                    try:
-                        await channel.delete()
-                    except:
-                        pass
-
-                await self.bot.db.delete_room(room["channel_id"])
-
-    # =========================
-    # Bot起動待ち
-    # =========================
-    @room_checker.before_loop
-    async def before_room_checker(self):
-        await self.bot.wait_until_ready()
             
 class HotelCog(commands.Cog):
 
@@ -471,4 +439,5 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
