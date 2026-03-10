@@ -326,33 +326,6 @@ class TimeButton(discord.ui.Button):
             ephemeral=True
         )
 
-    rooms = await self.bot.db.get_all_rooms()
-
-    now = datetime.utcnow()
-
-    for room in rooms:
-
-        expire = room["expire_at"]
-
-        if not expire:
-            continue
-
-        if now >= expire:
-
-            guild = self.bot.get_guild(int(room["guild_id"]))
-            if not guild:
-                continue
-
-            channel = guild.get_channel(int(room["channel_id"]))
-
-            if channel:
-
-                try:
-                    await channel.delete()
-                except:
-                    pass
-
-            await self.bot.db.delete_room(room["channel_id"])
 
 
             
@@ -361,6 +334,36 @@ class HotelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.room_checker.start()
+
+    @tasks.loop(minutes=1)
+    async def room_checker(self):
+
+        rooms = await self.bot.db.get_all_rooms()
+
+        now = datetime.utcnow()
+
+        for room in rooms:
+
+            expire = room["expire_at"]
+
+            if not expire:
+                continue
+
+            if now >= expire:
+
+                guild = self.bot.get_guild(int(room["guild_id"]))
+                if not guild:
+                    continue
+
+                channel = guild.get_channel(int(room["channel_id"]))
+
+                if channel:
+                    try:
+                        await channel.delete()
+                    except:
+                        pass
+
+                await self.bot.db.delete_room(room["channel_id"])
 
 
     # =========================
@@ -439,5 +442,6 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
