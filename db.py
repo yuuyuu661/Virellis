@@ -103,16 +103,6 @@ class Database:
                 PRIMARY KEY(owner_id, guild_id)
             )
             """)
-            # VCとTEXTを分離するためのカラム追加（自動マイグレーション）
-            await conn.execute("""
-            ALTER TABLE hotel_rooms
-            ADD COLUMN IF NOT EXISTS vc_id TEXT
-            """)
-
-            await conn.execute("""
-            ALTER TABLE hotel_rooms
-            ADD COLUMN IF NOT EXISTS text_id TEXT
-            """)
 
         print("✅ Tables ready")
 
@@ -203,15 +193,15 @@ class Database:
     async def remove_balance(self, user_id, guild_id, amount):
 
         row = await self._fetchrow("""
-            UPDATE users
-            SET balance = balance - $3
-            WHERE user_id=$1
-            AND guild_id=$2
-            AND balance >= $3
-            RETURNING balance
-            """, user_id, guild_id, amount)
+        UPDATE users
+        SET balance = balance - $3
+        WHERE user_id=$1
+        AND guild_id=$2
+        AND balance >= $3
+        RETURNING balance
+        """, user_id, guild_id, amount)
 
-            return row
+        return row
 
     # =========================
     # 残高ランキング
