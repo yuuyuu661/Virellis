@@ -152,7 +152,9 @@ class Database:
         await self._execute("""
         UPDATE users
         SET balance = balance - $3
-        WHERE user_id=$1 AND guild_id=$2
+        WHERE user_id=$1
+        AND guild_id=$2
+        AND balance >= $3
         """, user_id, guild_id, amount)
 
     # =========================
