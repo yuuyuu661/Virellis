@@ -42,7 +42,7 @@ class CheckinButton(discord.ui.Button):
             if vc is None:
                 await bot.db.delete_room(room["vc_id"])
             else:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     "⚠ すでにホテルルームを所持しています。",
                     ephemeral=True
                 )
@@ -88,12 +88,14 @@ class CheckinButton(discord.ui.Button):
         # ルーム保存
         expire_at = datetime.utcnow() + timedelta(hours=24)
 
+        new_expire = expire + timedelta(hours=24)
+
         await bot.db.save_room(
             user_id,
             guild_id,
-            str(vc.id),
-            str(text_channel.id),
-            expire_at
+            room["vc_id"],
+            room["text_id"],
+            new_expire
         )
 
         # ユーザー移動
@@ -416,6 +418,12 @@ class LockButton(discord.ui.Button):
 
         room = await interaction.client.db.get_room(str(interaction.channel.id))
 
+        if not room:
+            return await interaction.response.send_message(
+                "ホテルルームではありません",
+                ephemeral=True
+            )
+
         if str(interaction.user.id) != room["owner_id"]:
             return await interaction.response.send_message(
                 "部屋の所有者のみ実行できます",
@@ -533,7 +541,7 @@ class HotelCog(commands.Cog):
                 if not guild:
                     continue
 
-                channel = guild.get_channel(int(room["channel_id"]))
+                channel = guild.get_channel(int(room["vc_id"]))
                 if not channel:
                     await self.bot.db.delete_room(room["channel_id"])
                     continue
@@ -541,8 +549,8 @@ class HotelCog(commands.Cog):
                 if channel:
                     try:
                         await channel.delete()
-                    except:
-                        pass
+                    except Exception as e:
+                        print("room delete error", e)
 
                 await self.bot.db.delete_room(room["channel_id"])
 
@@ -623,6 +631,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
