@@ -183,15 +183,23 @@ class Database:
     ):
 
         await self._execute("""
-        INSERT INTO settings(guild_id,admin_roles,bank_roles,hotel_role,sub_role)
-        VALUES($1,$2,$3,$4,$5)
+        INSERT INTO settings(
+            guild_id,
+            admin_roles,
+            bank_roles,
+            hotel_role,
+            sub_role,
+            currency_unit
+        )
+        VALUES($1,$2,$3,$4,$5,$6)
         ON CONFLICT(guild_id)
         DO UPDATE SET
-        admin_roles=$2,
-        bank_roles=$3,
-        hotel_role=$4,
-        sub_role=$5
-        """, guild_id, admin_roles, bank_roles, hotel_role, sub_role)
+            admin_roles=$2,
+            bank_roles=$3,
+            hotel_role=$4,
+            sub_role=$5,
+            currency_unit=$6
+        """, guild_id, admin_roles, bank_roles, hotel_role, sub_role, currency_unit)
 
     # =========================
     # 設定取得
