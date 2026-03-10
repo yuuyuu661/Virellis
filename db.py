@@ -61,6 +61,47 @@ class Database:
             )
             """)
 
+
+            # =========================
+            # ホテル設定
+            # =========================
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS hotel_settings (
+                guild_id TEXT PRIMARY KEY,
+                manager_role TEXT,
+                log_channel TEXT,
+                sub_role TEXT,
+                ticket_price_1 INTEGER,
+                ticket_price_10 INTEGER,
+                ticket_price_30 INTEGER,
+                category_ids TEXT[]
+            )
+            """)
+
+            # =========================
+            # ホテルチケット
+            # =========================
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS hotel_tickets (
+                user_id TEXT,
+                guild_id TEXT,
+                tickets INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, guild_id)
+            )
+            """)
+
+            # =========================
+            # ホテルルーム
+            # =========================
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS hotel_rooms (
+                channel_id TEXT PRIMARY KEY,
+                guild_id TEXT,
+                owner_id TEXT,
+                expire_at TIMESTAMP
+            )
+            """)
+
         print("✅ Tables ready")
 
     # =========================
@@ -213,3 +254,140 @@ class Database:
         FROM settings
         WHERE guild_id=$1
         """, guild_id)
+
+
+    # =========================
+    # ホテル設定保存
+    # =========================
+    async def set_hotel_settings(
+        self,
+        guild_id,
+        manager_role,
+        log_channel,
+        sub_role,
+        ticket_price_1,
+        ticket_price_10,
+        ticket_price_30,
+        category_ids
+    ):
+        await self._execute("""
+        INSERT INTO hotel_settings (
+            guild_id,
+            manager_role,
+            log_channel,
+            sub_role,
+            ticket_price_1,
+            ticket_price_10,
+            ticket_price_30,
+            category_ids
+        )
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+        ON CONFLICT(guild_id)
+        DO UPDATE SET
+            manager_role=$2,
+            log_channel=$3,
+            sub_role=$4,
+            ticket_price_1=$5,
+            ticket_price_10=$6,
+            ticket_price_30=$7,
+            category_ids=$8
+        """, guild_id, manager_role, log_channel, sub_role,
+             ticket_price_1, ticket_price_10, ticket_price_30, category_ids)
+
+    # =========================
+    # ホテル設定取得
+    # =========================
+    async def get_hotel_settings(self, guild_id):
+        return await self._fetchrow("""
+        SELECT *
+        FROM hotel_settings
+        WHERE guild_id=$1
+        """, guild_id)
+
+    # =========================
+    # チケット取得
+    # =========================
+    async def get_tickets(self, user_id, guild_id):
+        row = await self._fetchrow("""
+        SELECT tickets
+        FROM hotel_tickets
+        WHERE user_id=$1 AND guild_id=$2
+        """, user_id, guild_id)
+
+        if not row:
+            await self._execute("""
+            INSERT INTO hotel_tickets(user_id, guild_id, tickets)
+            VALUES($1,$2,0)
+            """, user_id, guild_id)
+            return 0
+
+        return row["tickets"]
+
+    # =========================
+    # チケット加算
+    # =========================
+    async def add_tickets(self, user_id, guild_id, amount):
+        current = await self.get_tickets(user_id, guild_id)
+        new_amount = current + amount
+
+        await self._execute("""
+        UPDATE hotel_tickets
+        SET tickets=$1
+        WHERE user_id=$2 AND guild_id=$3
+        """, new_amount, user_id, guild_id)
+
+        return new_amount
+
+    # =========================
+    # チケット減算
+    # =========================
+    async def remove_tickets(self, user_id, guild_id, amount):
+        current = await self.get_tickets(user_id, guild_id)
+        new_amount = max(0, current - amount)
+
+        await self._execute("""
+        UPDATE hotel_tickets
+        SET tickets=$1
+        WHERE user_id=$2 AND guild_id=$3
+        """, new_amount, user_id, guild_id)
+
+        return new_amount
+
+    # =========================
+    # ルーム保存
+    # =========================
+    async def save_room(self, channel_id, guild_id, owner_id, expire_at):
+        await self._execute("""
+        INSERT INTO hotel_rooms (channel_id, guild_id, owner_id, expire_at)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (channel_id)
+        DO UPDATE SET expire_at=$4
+        """, channel_id, guild_id, owner_id, expire_at)
+
+    # =========================
+    # ルーム削除
+    # =========================
+    async def delete_room(self, channel_id):
+        await self._execute("""
+        DELETE FROM hotel_rooms
+        WHERE channel_id=$1
+        """, channel_id)
+
+    # =========================
+    # ルーム取得
+    # =========================
+    async def get_room(self, channel_id):
+        return await self._fetchrow("""
+        SELECT *
+        FROM hotel_rooms
+        WHERE channel_id=$1
+        """, channel_id)
+
+    # =========================
+    # 全ルーム取得
+    # =========================
+    async def get_all_rooms(self):
+        return await self._fetch("""
+        SELECT *
+        FROM hotel_rooms
+        """)
