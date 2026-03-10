@@ -389,7 +389,13 @@ class LimitModal(discord.ui.Modal, title="人数制限変更"):
 
     async def on_submit(self, interaction: discord.Interaction):
 
-        limit = int(self.limit.value)
+        try:
+            limit = int(self.limit.value)
+        except:
+            return await interaction.response.send_message(
+                "数字を入力してください",
+                ephemeral=True
+            )
 
         await interaction.channel.edit(user_limit=limit)
 
@@ -617,6 +623,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
