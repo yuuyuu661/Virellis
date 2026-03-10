@@ -11,7 +11,7 @@ class CheckinButton(discord.ui.Button):
         super().__init__(
             label="チェックイン",
             style=discord.ButtonStyle.green,
-            emoji="🏨"
+            emoji="🏨",
             custom_id="hotel_checkin"
         )
 
@@ -113,7 +113,7 @@ class TicketButton(discord.ui.Button):
         super().__init__(
             label="チケット購入",
             style=discord.ButtonStyle.blurple,
-            emoji="🎫"
+            emoji="🎫",
             custom_id="hotel_ticket"
         )
 
@@ -235,7 +235,7 @@ class ExtendButton(discord.ui.Button):
         super().__init__(
             label="24時間延長",
             style=discord.ButtonStyle.blurple,
-            emoji="🎫"
+            emoji="🎫",
             custom_id="hotel_extend"
         )
 
@@ -295,7 +295,7 @@ class DeleteRoomButton(discord.ui.Button):
         super().__init__(
             label="部屋を削除",
             style=discord.ButtonStyle.red,
-            emoji="🗑️"
+            emoji="🗑️",
             custom_id="hotel_delete"
         )
 
@@ -324,7 +324,7 @@ class TimeButton(discord.ui.Button):
         super().__init__(
             label="残り時間",
             style=discord.ButtonStyle.gray,
-            emoji="⏰"
+            emoji="⏰",
             custom_id="hotel_time"
         )
 
@@ -363,7 +363,7 @@ class LimitButton(discord.ui.Button):
         super().__init__(
             label="人数制限",
             style=discord.ButtonStyle.gray,
-            emoji="👥"
+            emoji="👥",
             custom_id="hotel_limit"
         )
 
@@ -415,7 +415,7 @@ class LockButton(discord.ui.Button):
         super().__init__(
             label="接続拒否",
             style=discord.ButtonStyle.red,
-            emoji="🔒"
+            emoji="🔒",
             custom_id="hotel_lock"
         )
 
@@ -453,7 +453,7 @@ class UnlockButton(discord.ui.Button):
         super().__init__(
             label="接続許可",
             style=discord.ButtonStyle.green,
-            emoji="🔓"
+            emoji="🔓",
             custom_id="hotel_unlock"
         )
 
@@ -492,7 +492,7 @@ class RenameButton(discord.ui.Button):
         super().__init__(
             label="名前変更",
             style=discord.ButtonStyle.gray,
-            emoji="✏️"
+            emoji="✏️",
             custom_id="hotel_rename"
         )
 
@@ -644,6 +644,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
