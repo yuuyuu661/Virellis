@@ -87,8 +87,10 @@ class AdminCog(commands.Cog):
 
         embed.add_field(name="ユーザー", value=user.mention, inline=False)
         embed.add_field(name="操作", value=操作, inline=True)
-        embed.add_field(name="金額", value=f"{金額:,}", inline=True)
-        embed.add_field(name="現在残高", value=f"{balance:,}", inline=False)
+        settings = await self.bot.db.get_settings(guild_id)
+        unit = settings["currency_unit"] if settings else ""
+        embed.add_field(name="金額", value=f"{金額:,} {unit}", inline=True)
+        embed.add_field(name="現在残高", value=f"{balance:,} {unit}", inline=False)
 
         await interaction.response.send_message(embed=embed)
 
@@ -108,6 +110,9 @@ class AdminCog(commands.Cog):
             )
 
         guild_id = str(interaction.guild.id)
+
+        settings = await self.bot.db.get_settings(guild_id)
+        unit = settings["currency_unit"] if settings else ""
 
         rows = await self.bot.db.get_ranking(guild_id)
 
@@ -133,7 +138,7 @@ class AdminCog(commands.Cog):
             else:
                 name = r["user_id"]
 
-            text += f"{i}. {name} — {r['balance']:,}\n"
+            text += f"{i}. {name} — {r['balance']:,} {unit}\n"
 
         embed.description = text
 
