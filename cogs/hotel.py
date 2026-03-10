@@ -34,10 +34,17 @@ class CheckinButton(discord.ui.Button):
         room = await bot.db.get_room_by_owner(user_id, guild_id)
 
         if room:
-            return await interaction.response.send_message(
-                "⚠ すでにホテルルームを所持しています。",
-                ephemeral=True
-            )
+
+            vc = interaction.guild.get_channel(int(room["channel_id"]))
+
+            # VCが存在しない場合は孤児データ削除
+            if vc is None:
+                await bot.db.delete_room(room["channel_id"])
+            else:
+                return await interaction.response.send_message(
+                    "⚠ すでにホテルルームを所持しています。",
+                    ephemeral=True
+                )
 
         tickets = await bot.db.get_tickets(user_id, guild_id)
 
@@ -211,6 +218,10 @@ class RoomView(discord.ui.View):
         self.add_item(ExtendButton())
         self.add_item(TimeButton())
         self.add_item(DeleteRoomButton())
+        self.add_item(LimitButton())
+        self.add_item(LockButton())
+        self.add_item(UnlockButton())
+        self.add_item(RenameButton())
 
 class ExtendButton(discord.ui.Button):
 
@@ -336,7 +347,150 @@ class TimeButton(discord.ui.Button):
             f"⏰ 残り {hours}時間 {minutes}分",
             ephemeral=True
         )
+class LimitButton(discord.ui.Button):
 
+    def __init__(self):
+        super().__init__(
+            label="人数制限",
+            style=discord.ButtonStyle.gray,
+            emoji="👥"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        room = await interaction.client.db.get_room(str(interaction.channel.id))
+
+        if not room:
+            return await interaction.response.send_message(
+                "ホテルルームではありません",
+                ephemeral=True
+            )
+
+        if str(interaction.user.id) != room["owner_id"]:
+            return await interaction.response.send_message(
+                "部屋の所有者のみ変更できます",
+                ephemeral=True
+            )
+
+        await interaction.response.send_modal(LimitModal())
+
+class LimitModal(discord.ui.Modal, title="人数制限変更"):
+
+    limit = discord.ui.TextInput(
+        label="人数",
+        placeholder="0 = 無制限",
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+
+        limit = int(self.limit.value)
+
+        await interaction.channel.edit(user_limit=limit)
+
+        await interaction.response.send_message(
+            f"👥 人数制限を {limit} に変更しました",
+            ephemeral=True
+        )
+class LockButton(discord.ui.Button):
+
+    def __init__(self):
+        super().__init__(
+            label="接続拒否",
+            style=discord.ButtonStyle.red,
+            emoji="🔒"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        room = await interaction.client.db.get_room(str(interaction.channel.id))
+
+        if str(interaction.user.id) != room["owner_id"]:
+            return await interaction.response.send_message(
+                "部屋の所有者のみ実行できます",
+                ephemeral=True
+            )
+
+        overwrite = interaction.channel.overwrites_for(interaction.guild.default_role)
+        overwrite.connect = False
+
+        await interaction.channel.set_permissions(
+            interaction.guild.default_role,
+            overwrite=overwrite
+        )
+
+        await interaction.response.send_message(
+            "🔒 接続を拒否しました",
+            ephemeral=True
+        )
+class UnlockButton(discord.ui.Button):
+
+    def __init__(self):
+        super().__init__(
+            label="接続許可",
+            style=discord.ButtonStyle.green,
+            emoji="🔓"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        room = await interaction.client.db.get_room(str(interaction.channel.id))
+
+        if str(interaction.user.id) != room["owner_id"]:
+            return await interaction.response.send_message(
+                "部屋の所有者のみ実行できます",
+                ephemeral=True
+            )
+
+        overwrite = interaction.channel.overwrites_for(interaction.guild.default_role)
+        overwrite.connect = None
+
+        await interaction.channel.set_permissions(
+            interaction.guild.default_role,
+            overwrite=overwrite
+        )
+
+        await interaction.response.send_message(
+            "🔓 接続を許可しました",
+            ephemeral=True
+        )
+
+class RenameButton(discord.ui.Button):
+
+    def __init__(self):
+        super().__init__(
+            label="名前変更",
+            style=discord.ButtonStyle.gray,
+            emoji="✏️"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        room = await interaction.client.db.get_room(str(interaction.channel.id))
+
+        if str(interaction.user.id) != room["owner_id"]:
+            return await interaction.response.send_message(
+                "部屋の所有者のみ変更できます",
+                ephemeral=True
+            )
+
+        await interaction.response.send_modal(RenameModal())
+
+class RenameModal(discord.ui.Modal, title="部屋名変更"):
+
+    name = discord.ui.TextInput(
+        label="新しい部屋名",
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+
+        await interaction.channel.edit(name=self.name.value)
+
+        await interaction.response.send_message(
+            "✏️ 部屋名を変更しました",
+            ephemeral=True
+        )
 
 
             
@@ -367,6 +521,9 @@ class HotelCog(commands.Cog):
                     continue
 
                 channel = guild.get_channel(int(room["channel_id"]))
+                if not channel:
+                    await self.bot.db.delete_room(room["channel_id"])
+                    continue
 
                 if channel:
                     try:
@@ -453,6 +610,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
