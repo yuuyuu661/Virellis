@@ -109,8 +109,16 @@ class Database:
     # =========================
     async def get_balance(self, user_id, guild_id):
 
-        user = await self.get_user(user_id, guild_id)
-        return user["balance"]
+        row = await self._fetchrow("""
+        SELECT balance
+        FROM users
+        WHERE user_id=$1 AND guild_id=$2
+        """, user_id, guild_id)
+
+        if not row:
+            return None
+
+        return row["balance"]
 
     # =========================
     # 残高設定
