@@ -23,7 +23,8 @@ class InitCog(commands.Cog):
         管理者ロール: discord.Role,
         銀行ロール: discord.Role,
         ホテルロール: discord.Role,
-        サブ垢ロール: discord.Role
+        サブ垢ロール: discord.Role,
+        通貨単位: str
     ):
 
         # 実行者チェック
@@ -41,7 +42,8 @@ class InitCog(commands.Cog):
             admin_roles=[str(管理者ロール.id)],
             bank_roles=[str(銀行ロール.id)],
             hotel_role=str(ホテルロール.id),
-            sub_role=str(サブ垢ロール.id)
+            sub_role=str(サブ垢ロール.id),
+            currency_unit=通貨単位
         )
 
         embed = discord.Embed(
@@ -82,3 +84,4 @@ class InitCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(InitCog(bot))
+
