@@ -12,6 +12,7 @@ class CheckinButton(discord.ui.Button):
             label="チェックイン",
             style=discord.ButtonStyle.green,
             emoji="🏨"
+            custom_id="hotel_checkin"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -113,6 +114,7 @@ class TicketButton(discord.ui.Button):
             label="チケット購入",
             style=discord.ButtonStyle.blurple,
             emoji="🎫"
+            custom_id="hotel_ticket"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -234,6 +236,7 @@ class ExtendButton(discord.ui.Button):
             label="24時間延長",
             style=discord.ButtonStyle.blurple,
             emoji="🎫"
+            custom_id="hotel_extend"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -293,6 +296,7 @@ class DeleteRoomButton(discord.ui.Button):
             label="部屋を削除",
             style=discord.ButtonStyle.red,
             emoji="🗑️"
+            custom_id="hotel_delete"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -321,6 +325,7 @@ class TimeButton(discord.ui.Button):
             label="残り時間",
             style=discord.ButtonStyle.gray,
             emoji="⏰"
+            custom_id="hotel_time"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -359,6 +364,7 @@ class LimitButton(discord.ui.Button):
             label="人数制限",
             style=discord.ButtonStyle.gray,
             emoji="👥"
+            custom_id="hotel_limit"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -410,6 +416,7 @@ class LockButton(discord.ui.Button):
             label="接続拒否",
             style=discord.ButtonStyle.red,
             emoji="🔒"
+            custom_id="hotel_lock"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -447,6 +454,7 @@ class UnlockButton(discord.ui.Button):
             label="接続許可",
             style=discord.ButtonStyle.green,
             emoji="🔓"
+            custom_id="hotel_unlock"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -485,6 +493,7 @@ class RenameButton(discord.ui.Button):
             label="名前変更",
             style=discord.ButtonStyle.gray,
             emoji="✏️"
+            custom_id="hotel_rename"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -635,6 +644,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
