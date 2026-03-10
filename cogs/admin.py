@@ -167,25 +167,32 @@ class AdminCog(commands.Cog):
             if role in m.roles and not m.bot
         ]
 
-        count = 0
+        success_count = 0
+        failed_users = []
 
         for m in members:
 
             uid = str(m.id)
 
+            balance = await self.bot.db.get_balance(uid, guild_id)
+
             if 操作 == "増加":
 
                 await self.bot.db.add_balance(uid, guild_id, 金額)
+                success_count += 1
 
             elif 操作 == "減少":
 
+                if balance is None or balance < 金額:
+
+                    failed_users.append(m)
+                    continue
+
                 await self.bot.db.remove_balance(uid, guild_id, 金額)
+                success_count += 1
 
             else:
-
                 continue
-
-            count += 1
 
         embed = discord.Embed(
             title="💸 ロール送金",
@@ -195,9 +202,16 @@ class AdminCog(commands.Cog):
         embed.add_field(name="対象ロール", value=role.mention, inline=False)
         embed.add_field(name="操作", value=操作, inline=True)
         embed.add_field(name="金額", value=f"{金額:,}", inline=True)
-        embed.add_field(name="対象人数", value=count, inline=False)
+        embed.add_field(name="成功人数", value=success_count, inline=False)
 
         await interaction.response.send_message(embed=embed)
+        if failed_users:
+
+            mentions = " ".join(m.mention for m in failed_users)
+
+            await interaction.channel.send(
+                f"⚠ 残高不足で減少できなかったユーザー\n{mentions}"
+            )
 
 
 async def setup(bot):
