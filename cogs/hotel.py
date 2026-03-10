@@ -41,7 +41,7 @@ class CheckinButton(discord.ui.Button):
 
             # VCが存在しない場合は孤児データ削除
             if vc is None:
-                await bot.db.delete_room(room["text_id"])
+                await bot.db.delete_room(room["owner_id"], room["guild_id"])
             else:
                 return await interaction.followup.send(
                     "⚠ すでにホテルルームを所持しています。",
@@ -90,11 +90,11 @@ class CheckinButton(discord.ui.Button):
         expire_at = datetime.utcnow() + timedelta(hours=24)
 
         await bot.db.save_room(
-            user_id,
             guild_id,
-            str(vc.id),
-            str(text_channel.id),
-            expire_at
+            user_id,
+            room["vc_id"],
+            room["text_id"],
+            new_expire
         )
 
         # ユーザー移動
@@ -561,7 +561,7 @@ class HotelCog(commands.Cog):
 
                 channel = guild.get_channel(int(room["vc_id"]))
                 if not channel:
-                    await self.bot.db.delete_room(room["text_id"])
+                    await self.bot.db.delete_room(room["owner_id"], room["guild_id"])
                     continue
 
                 if channel:
@@ -570,7 +570,7 @@ class HotelCog(commands.Cog):
                     except Exception as e:
                         print("room delete error", e)
 
-                await self.bot.db.delete_room(room["text_id"])
+                await self.bot.db.delete_room(room["owner_id"], room["guild_id"])
 
 
     # =========================
@@ -649,6 +649,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
