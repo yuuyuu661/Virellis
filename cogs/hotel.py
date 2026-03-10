@@ -15,6 +15,7 @@ class CheckinButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
 
         bot = interaction.client
         guild_id = str(interaction.guild.id)
@@ -98,7 +99,7 @@ class CheckinButton(discord.ui.Button):
         if interaction.user.voice:
             await interaction.user.move_to(vc)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"🏨 {vc.mention} を作成しました",
             ephemeral=True
         )
@@ -141,6 +142,8 @@ class Ticket1(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+
+        
 
         bot = interaction.client
         guild_id = str(interaction.guild.id)
@@ -610,6 +613,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
