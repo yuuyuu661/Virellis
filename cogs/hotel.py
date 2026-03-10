@@ -24,7 +24,7 @@ class CheckinButton(discord.ui.Button):
         settings = await bot.db.get_hotel_settings(guild_id)
 
         if not settings:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "ホテルが初期設定されていません。",
                 ephemeral=True
             )
@@ -36,11 +36,11 @@ class CheckinButton(discord.ui.Button):
 
         if room:
 
-            vc = interaction.guild.get_channel(int(room["channel_id"]))
+            vc = interaction.guild.get_channel(int(room["vc_id"]))
 
             # VCが存在しない場合は孤児データ削除
             if vc is None:
-                await bot.db.delete_room(room["channel_id"])
+                await bot.db.delete_room(room["vc_id"])
             else:
                 return await interaction.response.send_message(
                     "⚠ すでにホテルルームを所持しています。",
@@ -89,9 +89,10 @@ class CheckinButton(discord.ui.Button):
         expire_at = datetime.utcnow() + timedelta(hours=24)
 
         await bot.db.save_room(
-            str(vc.id),
-            guild_id,
             user_id,
+            guild_id,
+            str(vc.id),
+            str(text_channel.id),
             expire_at
         )
 
@@ -273,10 +274,11 @@ class ExtendButton(discord.ui.Button):
         new_expire = expire + timedelta(hours=24)
 
         await bot.db.save_room(
-            str(interaction.channel.id),
-            guild_id,
             user_id,
-            new_expire
+            guild_id,
+            str(vc.id),
+            str(text_channel.id),
+            expire_at
         )
 
         await interaction.response.send_message(
@@ -501,6 +503,8 @@ class HotelCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        bot.add_view(HotelView())
+        bot.add_view(RoomView())
         self.room_checker.start()
 
     @tasks.loop(minutes=1)
@@ -613,6 +617,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
