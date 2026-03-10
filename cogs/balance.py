@@ -47,6 +47,8 @@ class BalanceCog(commands.Cog):
             str(user.id),
             guild_id
         )
+        settings = await self.bot.db.get_settings(guild_id)
+        unit = settings["currency_unit"] if settings else ""
 
         if balance is None:
 
@@ -68,7 +70,7 @@ class BalanceCog(commands.Cog):
 
         embed.add_field(
             name="残高",
-            value=f"{balance:,}",
+            value=f"{balance:,} {unit}",
             inline=False
         )
 
@@ -151,11 +153,14 @@ class BalanceCog(commands.Cog):
             inline=False
         )
 
+        settings = await self.bot.db.get_settings(guild_id)
+        unit = settings["currency_unit"] if settings else ""        
         embed.add_field(
             name="金額",
-            value=f"{amount:,}",
+            value=f"{amount:,} {unit}",
             inline=False
         )
+
 
         await interaction.response.send_message(embed=embed)
 
