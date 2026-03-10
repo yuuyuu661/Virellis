@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 GUILD_ID = 1475448864122208350
+from datetime import datetime, timedelta
+from discord.ext import tasks
 
 class CheckinButton(discord.ui.Button):
 
@@ -51,13 +53,27 @@ class CheckinButton(discord.ui.Button):
             name=f"{interaction.user.display_name}の部屋",
             category=category
         )
+        text_channel = interaction.channel
+
+        embed = discord.Embed(
+            title="🏨 ホテルルーム",
+            description="この部屋は24時間で自動削除されます\nチケットで延長できます",
+            color=0x2ecc71
+        )
+
+        await text_channel.send(
+            embed=embed,
+            view=RoomView()
+        )
 
         # ルーム保存
+        expire_at = datetime.utcnow() + timedelta(hours=24)
+
         await bot.db.save_room(
             str(vc.id),
             guild_id,
             user_id,
-            None
+            expire_at
         )
 
         # ユーザー移動
@@ -175,12 +191,208 @@ class HotelView(discord.ui.View):
 
         self.add_item(CheckinButton())
         self.add_item(TicketButton())
+        
+class RoomView(discord.ui.View):
 
+    def __init__(self):
+        super().__init__(timeout=None)
+
+        self.add_item(ExtendButton())
+        self.add_item(TimeButton())
+        self.add_item(DeleteRoomButton())
+
+class ExtendButton(discord.ui.Button):
+
+    def __init__(self):
+        super().__init__(
+            label="24時間延長",
+            style=discord.ButtonStyle.blurple,
+            emoji="🎫"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        bot = interaction.client
+        guild_id = str(interaction.guild.id)
+        user_id = str(interaction.user.id)
+
+        room = await bot.db.get_room(str(interaction.channel.id))
+
+        if not room:
+            return await interaction.response.send_message(
+                "このチャンネルはホテルではありません",
+                ephemeral=True
+            )
+
+        if room["owner_id"] != user_id:
+            return await interaction.response.send_message(
+                "部屋の所有者のみ延長できます",
+                ephemeral=True
+            )
+
+        tickets = await bot.db.get_tickets(user_id, guild_id)
+
+        if tickets <= 0:
+            return await interaction.response.send_message(
+                "チケットがありません",
+                ephemeral=True
+            )
+
+        await bot.db.remove_tickets(user_id, guild_id, 1)
+
+        await interaction.response.send_message(
+            "🏨 24時間延長しました",
+            ephemeral=True
+        )
+
+class DeleteRoomButton(discord.ui.Button):
+
+    def __init__(self):
+        super().__init__(
+            label="部屋を削除",
+            style=discord.ButtonStyle.red,
+            emoji="🗑️"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        bot = interaction.client
+
+        room = await bot.db.get_room(str(interaction.channel.id))
+
+        if not room:
+            return
+
+        if str(interaction.user.id) != room["owner_id"]:
+            return await interaction.response.send_message(
+                "部屋の所有者のみ削除できます",
+                ephemeral=True
+            )
+
+        await bot.db.delete_room(str(interaction.channel.id))
+
+        await interaction.channel.delete()
+
+class TimeButton(discord.ui.Button):
+
+    def __init__(self):
+        super().__init__(
+            label="残り時間",
+            style=discord.ButtonStyle.gray,
+            emoji="⏰"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        bot = interaction.client
+        room = await bot.db.get_room(str(interaction.channel.id))
+
+        if not room:
+            return await interaction.response.send_message(
+                "ホテルルームではありません",
+                ephemeral=True
+            )
+
+        expire = room["expire_at"]
+
+        if not expire:
+            return await interaction.response.send_message(
+                "期限情報がありません",
+                ephemeral=True
+            )
+
+        now = datetime.utcnow()
+        remaining = expire - now
+
+        hours = int(remaining.total_seconds() // 3600)
+        minutes = int((remaining.total_seconds() % 3600) // 60)
+
+        await interaction.response.send_message(
+            f"⏰ 残り {hours}時間 {minutes}分",
+            ephemeral=True
+        )
+@tasks.loop(minutes=1)
+async def room_checker(self):
+
+    rooms = await self.bot.db.get_all_rooms()
+
+    now = datetime.utcnow()
+
+    for room in rooms:
+
+        expire = room["expire_at"]
+
+        if not expire:
+            continue
+
+        if now >= expire:
+
+            guild = self.bot.get_guild(int(room["guild_id"]))
+            if not guild:
+                continue
+
+            channel = guild.get_channel(int(room["channel_id"]))
+
+            if channel:
+
+                try:
+                    await channel.delete()
+                except:
+                    pass
+
+            await self.bot.db.delete_room(room["channel_id"])
 
 class HotelCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.room_checker.start()
+
+    # =========================
+    # ルーム期限チェック
+    # =========================
+    @tasks.loop(minutes=1)
+    async def room_checker(self):
+
+        rooms = await self.bot.db.get_all_rooms()
+
+        now = datetime.utcnow()
+
+        for room in rooms:
+
+            expire = room["expire_at"]
+
+            if not expire:
+                continue
+
+            if now >= expire:
+
+                guild = self.bot.get_guild(int(room["guild_id"]))
+                if not guild:
+                    continue
+
+                channel = guild.get_channel(int(room["channel_id"]))
+
+                if channel:
+                    try:
+                        await channel.delete()
+                    except:
+                        pass
+
+                await self.bot.db.delete_room(room["channel_id"])
+
+    # =========================
+    # Bot起動待ち
+    # =========================
+    @room_checker.before_loop
+    async def before_room_checker(self):
+        await self.bot.wait_until_ready()
+            
+class HotelCog(commands.Cog):
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.room_checker.start()
 
 
     # =========================
@@ -259,3 +471,4 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
