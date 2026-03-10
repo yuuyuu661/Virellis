@@ -69,10 +69,12 @@ class CheckinButton(discord.ui.Button):
         await bot.db.remove_tickets(user_id, guild_id, 1)
 
         # VC作成
+        # VC作成
         vc = await interaction.guild.create_voice_channel(
             name=f"{interaction.user.display_name}の部屋",
             category=category
         )
+
         text_channel = interaction.channel
 
         embed = discord.Embed(
@@ -92,9 +94,9 @@ class CheckinButton(discord.ui.Button):
         await bot.db.save_room(
             guild_id,
             user_id,
-            room["vc_id"],
-            room["text_id"],
-            new_expire
+            str(vc.id),
+            str(interaction.channel.id),
+            expire_at
         )
 
         # ユーザー移動
@@ -649,6 +651,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
