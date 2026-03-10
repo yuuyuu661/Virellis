@@ -88,14 +88,12 @@ class CheckinButton(discord.ui.Button):
         # ルーム保存
         expire_at = datetime.utcnow() + timedelta(hours=24)
 
-        new_expire = expire + timedelta(hours=24)
-
         await bot.db.save_room(
             user_id,
             guild_id,
-            room["vc_id"],
-            room["text_id"],
-            new_expire
+            str(vc.id),
+            str(text_channel.id),
+            expire_at
         )
 
         # ユーザー移動
@@ -278,9 +276,9 @@ class ExtendButton(discord.ui.Button):
         await bot.db.save_room(
             user_id,
             guild_id,
-            str(vc.id),
-            str(text_channel.id),
-            expire_at
+            room["vc_id"],
+            room["text_id"],
+            new_expire
         )
 
         await interaction.response.send_message(
@@ -455,6 +453,12 @@ class UnlockButton(discord.ui.Button):
 
         room = await interaction.client.db.get_room(str(interaction.channel.id))
 
+        if not room:
+            return await interaction.response.send_message(
+                "ホテルルームではありません",
+                ephemeral=True
+            )
+
         if str(interaction.user.id) != room["owner_id"]:
             return await interaction.response.send_message(
                 "部屋の所有者のみ実行できます",
@@ -543,7 +547,7 @@ class HotelCog(commands.Cog):
 
                 channel = guild.get_channel(int(room["vc_id"]))
                 if not channel:
-                    await self.bot.db.delete_room(room["channel_id"])
+                    await self.bot.db.delete_room(room["vc_id"])
                     continue
 
                 if channel:
@@ -552,7 +556,7 @@ class HotelCog(commands.Cog):
                     except Exception as e:
                         print("room delete error", e)
 
-                await self.bot.db.delete_room(room["channel_id"])
+                await self.bot.db.delete_room(room["vc_id"])
 
 
     # =========================
@@ -631,6 +635,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
