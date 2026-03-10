@@ -48,6 +48,13 @@ class BalanceCog(commands.Cog):
             guild_id
         )
 
+        if balance is None:
+
+            return await interaction.response.send_message(
+                "このユーザーはまだ通貨を使用していません。",
+                ephemeral=True
+            )
+
         embed = discord.Embed(
             title="💰 残高",
             color=0x2ecc71
