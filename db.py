@@ -55,6 +55,15 @@ class Database:
             """)
 
             await db.commit()
+            # =========================
+            # BOT設定
+            # =========================
+            await db.execute("""
+            CREATE TABLE IF NOT EXISTS settings(
+                guild_id TEXT PRIMARY KEY,
+                admin_roles TEXT
+            )
+            """)
 
     # =========================
     # ユーザー残高
@@ -340,3 +349,25 @@ class Database:
             )
 
             await db.commit()
+    # =========================
+    # 管理者設定
+    # =========================
+    async def get_settings(self, guild_id):
+
+        async with aiosqlite.connect(self.db_path) as db:
+
+            async with db.execute(
+                "SELECT admin_roles FROM settings WHERE guild_id=?",
+                (guild_id,)
+            ) as cursor:
+
+                row = await cursor.fetchone()
+
+                if not row:
+                    return {"admin_roles": []}
+
+                roles = row[0]
+
+                return {
+                    "admin_roles": roles.split(",") if roles else []
+                }
