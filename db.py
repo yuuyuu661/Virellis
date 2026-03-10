@@ -95,11 +95,23 @@ class Database:
             # =========================
             await conn.execute("""
             CREATE TABLE IF NOT EXISTS hotel_rooms (
-                channel_id TEXT PRIMARY KEY,
-                guild_id TEXT,
                 owner_id TEXT,
-                expire_at TIMESTAMP
+                guild_id TEXT,
+                vc_id TEXT,
+                text_id TEXT,
+                expire_at TIMESTAMP,
+                PRIMARY KEY(owner_id, guild_id)
             )
+            """)
+            # VCとTEXTを分離するためのカラム追加（自動マイグレーション）
+            await conn.execute("""
+            ALTER TABLE hotel_rooms
+            ADD COLUMN IF NOT EXISTS vc_id TEXT
+            """)
+
+            await conn.execute("""
+            ALTER TABLE hotel_rooms
+            ADD COLUMN IF NOT EXISTS text_id TEXT
             """)
 
         print("✅ Tables ready")
@@ -157,7 +169,7 @@ class Database:
         """, user_id, guild_id)
 
         if not row:
-            return None
+            return 0
 
         return row["balance"]
 
@@ -190,13 +202,16 @@ class Database:
     # =========================
     async def remove_balance(self, user_id, guild_id, amount):
 
-        await self._execute("""
-        UPDATE users
-        SET balance = balance - $3
-        WHERE user_id=$1
-        AND guild_id=$2
-        AND balance >= $3
-        """, user_id, guild_id, amount)
+        row = await self._fetchrow("""
+            UPDATE users
+            SET balance = balance - $3
+            WHERE user_id=$1
+            AND guild_id=$2
+            AND balance >= $3
+            RETURNING balance
+            """, user_id, guild_id, amount)
+
+            return row
 
     # =========================
     # 残高ランキング
@@ -327,60 +342,73 @@ class Database:
     # チケット加算
     # =========================
     async def add_tickets(self, user_id, guild_id, amount):
-        current = await self.get_tickets(user_id, guild_id)
-        new_amount = current + amount
 
-        await self._execute("""
-        UPDATE hotel_tickets
-        SET tickets=$1
-        WHERE user_id=$2 AND guild_id=$3
-        """, new_amount, user_id, guild_id)
+        row = await self._fetchrow("""
+        INSERT INTO hotel_tickets(user_id, guild_id, tickets)
+        VALUES($1, $2, $3)
+        ON CONFLICT(user_id, guild_id)
+        DO UPDATE SET tickets = hotel_tickets.tickets + $3
+        RETURNING tickets
+        """, user_id, guild_id, amount)
 
-        return new_amount
+        return row["tickets"]
 
     # =========================
     # チケット減算
     # =========================
     async def remove_tickets(self, user_id, guild_id, amount):
-        current = await self.get_tickets(user_id, guild_id)
-        new_amount = max(0, current - amount)
 
-        await self._execute("""
+        row = await self._fetchrow("""
         UPDATE hotel_tickets
-        SET tickets=$1
-        WHERE user_id=$2 AND guild_id=$3
-        """, new_amount, user_id, guild_id)
+        SET tickets = GREATEST(tickets - $3, 0)
+        WHERE user_id=$1 AND guild_id=$2
+        RETURNING tickets
+        """, user_id, guild_id, amount)
 
-        return new_amount
+        return row["tickets"]
 
     # =========================
     # ルーム保存
     # =========================
-    async def save_room(self, channel_id, guild_id, owner_id, expire_at):
+    async def save_room(self, guild_id, owner_id, vc_id, text_id, expire_at):
+
         await self._execute("""
-        INSERT INTO hotel_rooms (channel_id, guild_id, owner_id, expire_at)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (channel_id)
-        DO UPDATE SET expire_at=$4
-        """, channel_id, guild_id, owner_id, expire_at)
+        INSERT INTO hotel_rooms (
+            owner_id,
+            guild_id,
+            vc_id,
+            text_id,
+            expire_at
+        )
+        VALUES ($1,$2,$3,$4,$5)
+        ON CONFLICT(owner_id, guild_id)
+        DO UPDATE SET
+            vc_id=$3,
+            text_id=$4,
+            expire_at=$5
+        """, owner_id, guild_id, vc_id, text_id, expire_at)
 
     # =========================
     # ルーム削除
     # =========================
-    async def delete_room(self, channel_id):
+    async def delete_room(self, owner_id, guild_id):
+
         await self._execute("""
         DELETE FROM hotel_rooms
-        WHERE channel_id=$1
-        """, channel_id)
+        WHERE owner_id=$1
+        AND guild_id=$2
+        """, owner_id, guild_id)
 
     # =========================
     # ルーム取得
     # =========================
     async def get_room(self, channel_id):
+
         return await self._fetchrow("""
         SELECT *
         FROM hotel_rooms
-        WHERE channel_id=$1
+        WHERE vc_id=$1
+        OR text_id=$1
         """, channel_id)
 
     # =========================
@@ -390,4 +418,27 @@ class Database:
         return await self._fetch("""
         SELECT *
         FROM hotel_rooms
+        """)
+
+    # =========================
+    # 所有者からルーム取得
+    # =========================
+    async def get_room_by_owner(self, owner_id, guild_id):
+
+        return await self._fetchrow("""
+        SELECT *
+        FROM hotel_rooms
+        WHERE owner_id=$1
+        AND guild_id=$2
+        """, owner_id, guild_id)
+
+    # =========================
+    # 期限切れルーム取得
+    # =========================
+    async def get_expired_rooms(self):
+
+        return await self._fetch("""
+        SELECT *
+        FROM hotel_rooms
+        WHERE expire_at <= NOW()
         """)
