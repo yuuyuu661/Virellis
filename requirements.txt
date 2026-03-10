@@ -3,4 +3,5 @@ asyncpg
 python-dotenv
 pillow
 fastapi
+aiosqlite
 uvicorn
