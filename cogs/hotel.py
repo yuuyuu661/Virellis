@@ -79,7 +79,7 @@ class CheckinButton(discord.ui.Button):
             color=0x2ecc71
         )
 
-        await vc.send(
+        await interaction.channel.send(
             embed=embed,
             view=RoomView()
         )
@@ -610,6 +610,7 @@ class HotelCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(HotelCog(bot))
+
 
 
 
