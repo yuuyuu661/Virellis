@@ -64,6 +64,8 @@ async def load_cogs():
         "cogs.init",
         "cogs.balance",
         "cogs.admin",
+        "cogs.hotel",
+        
     ]
 
     for ext in extensions:
@@ -91,4 +93,5 @@ async def main():
 # =========================
 if __name__ == "__main__":
     asyncio.run(main())
+
 
