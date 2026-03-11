@@ -41,6 +41,10 @@ class Database:
                 PRIMARY KEY(user_id,guild_id)
             )
             """)
+            await conn.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS tickets INTEGER DEFAULT 0
+            """)
 
             # =========================
             # settings
