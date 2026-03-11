@@ -52,7 +52,7 @@ class InitCog(commands.Cog):
 
         embed.add_field(name="管理者ロール", value=管理者ロール.mention)
         embed.add_field(name="銀行ロール", value=銀行ロール.mention)
-       embed.add_field(name="ホテルロール", value=ホテルロール.mention)
+        embed.add_field(name="ホテルロール", value=ホテルロール.mention)
         embed.add_field(name="サブ垢ロール", value=サブ垢ロール.mention)
 
         await interaction.followup.send(embed=embed)
@@ -64,6 +64,7 @@ class InitCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(InitCog(bot))
+
 
 
 
