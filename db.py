@@ -365,7 +365,14 @@ class Database:
         async with self.pool.acquire() as conn:
 
             await conn.execute("""
-            INSERT INTO settings
+            INSERT INTO settings(
+                guild_id,
+                admin_roles,
+                bank_roles,
+                hotel_role,
+                sub_role,
+                currency_unit
+            )
             VALUES($1,$2,$3,$4,$5,$6)
             ON CONFLICT(guild_id)
             DO UPDATE SET
