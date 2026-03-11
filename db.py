@@ -63,7 +63,7 @@ class Database:
                     FROM information_schema.columns
                     WHERE table_name='settings'
                     AND column_name='admin_roles'
-                    AND udt_name LIKE '\_%'
+                    AND udt_name LIKE '\\_%'
                 ) THEN
                     ALTER TABLE settings
                     ALTER COLUMN admin_roles TYPE TEXT USING admin_roles::TEXT;
@@ -79,7 +79,7 @@ class Database:
                     FROM information_schema.columns
                     WHERE table_name='settings'
                     AND column_name='bank_roles'
-                    AND udt_name LIKE '\_%'
+                    AND udt_name LIKE '\\_%'
                 ) THEN
                     ALTER TABLE settings
                     ALTER COLUMN bank_roles TYPE TEXT USING bank_roles::TEXT;
