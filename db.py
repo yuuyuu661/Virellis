@@ -441,3 +441,11 @@ class Database:
             await db.commit()
 
         return await self.get_balance(user_id, guild_id)
+
+    async def update_room_expire(self, vc_id, expire):
+
+        await self._execute("""
+            UPDATE hotel_rooms
+            SET expire_at = $2
+            WHERE vc_id = $1
+        """, vc_id, expire)
