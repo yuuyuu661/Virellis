@@ -706,6 +706,27 @@ class CheckinButton(discord.ui.Button):
                 expire_at
             )
 
+            embed = discord.Embed(
+                title="🏨 ホテルルーム",
+                description=(
+                    "この部屋は24時間で自動削除されます\n"
+                    "チケットで延長できます\n\n"
+                    f"期限: <t:{int(expire_at.timestamp())}:F>"
+                ),
+                color=0x2ecc71
+            )
+
+            try:
+                await vc.send(embed=embed, view=RoomView())
+                print("ROOM PANEL SENT OK")
+
+            except Exception as e:
+                print("ROOM PANEL ERROR:", e)
+                await interaction.followup.send(
+                    f"パネル送信エラー: {e}",
+                    ephemeral=True
+                )
+
             await interaction.followup.send(
                 f"🏨 {vc.mention} を作成しました",
                 ephemeral=True
@@ -1079,6 +1100,7 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
 
 
