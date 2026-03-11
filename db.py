@@ -130,18 +130,27 @@ class Database:
             # =========================
             # hotel_rooms
             # =========================
-            await conn.execute("""
-            CREATE TABLE IF NOT EXISTS hotel_rooms(
-                guild_id TEXT,
-                owner_id TEXT,
-                vc_id TEXT,
-                text_id TEXT,
-                expire_at TIMESTAMP,
-                PRIMARY KEY(owner_id,guild_id)
-            )
+            table_exists = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'hotel_rooms'
+                )
             """)
 
-            # 🔥 ここに入れる
+            if not table_exists:
+                await conn.execute("""
+                    CREATE TABLE hotel_rooms(
+                        guild_id TEXT,
+                        owner_id TEXT,
+                        vc_id TEXT,
+                        text_id TEXT,
+                        expire_at TIMESTAMP,
+                        PRIMARY KEY(owner_id,guild_id)
+                    )
+                """)
+                print("[DB] hotel_rooms created")
+
+            # 🔥 expire_at 型修正
             try:
                 col_type = await conn.fetchval("""
                     SELECT udt_name
@@ -156,27 +165,49 @@ class Database:
                         ALTER COLUMN expire_at TYPE TIMESTAMP
                         USING expire_at::timestamp
                     """)
-                    print("[DB MIGRATION] hotel_rooms.expire_at TEXT → TIMESTAMP")
+                    print("[DB MIGRATION] expire_at fixed")
 
             except Exception as e:
                 print("[DB MIGRATION ERROR expire_at]", e)
 
+            # 🔥 channel_id削除
+            try:
+                cols = await conn.fetch("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name='hotel_rooms'
+                """)
+
+                col_names = [c["column_name"] for c in cols]
+
+                if "channel_id" in col_names:
+                    await conn.execute("""
+                        ALTER TABLE hotel_rooms
+                        DROP COLUMN channel_id
+                    """)
+                    print("[DB MIGRATION] channel_id removed")
+
+            except Exception as e:
+                print("[DB MIGRATION ERROR channel_id]", e)
+
+            # 🔥 vc_id
             await conn.execute("""
-            ALTER TABLE hotel_rooms
-            ADD COLUMN IF NOT EXISTS vc_id TEXT
+                ALTER TABLE hotel_rooms
+                ADD COLUMN IF NOT EXISTS vc_id TEXT
             """)
 
+            # 🔥 text_id
             await conn.execute("""
-            ALTER TABLE hotel_rooms
-            ADD COLUMN IF NOT EXISTS text_id TEXT
+                ALTER TABLE hotel_rooms
+                ADD COLUMN IF NOT EXISTS text_id TEXT
             """)
-            
+
+            # 🔥 PK
             await conn.execute("""
             DO $$
             BEGIN
                 IF NOT EXISTS (
-                    SELECT 1
-                    FROM pg_constraint
+                    SELECT 1 FROM pg_constraint
                     WHERE conname = 'hotel_rooms_pkey'
                 ) THEN
                     ALTER TABLE hotel_rooms
