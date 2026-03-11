@@ -140,6 +140,26 @@ class Database:
                 PRIMARY KEY(owner_id,guild_id)
             )
             """)
+
+            # 🔥 ここに入れる
+            try:
+                col_type = await conn.fetchval("""
+                    SELECT data_type
+                    FROM information_schema.columns
+                    WHERE table_name='hotel_rooms'
+                    AND column_name='expire_at'
+                """)
+
+                if col_type == "text":
+                    await conn.execute("""
+                        ALTER TABLE hotel_rooms
+                        ALTER COLUMN expire_at TYPE TIMESTAMP
+                        USING expire_at::timestamp
+                    """)
+                    print("[DB MIGRATION] hotel_rooms.expire_at TEXT → TIMESTAMP")
+            except Exception as e:
+                print("[DB MIGRATION ERROR expire_at]", e)
+
             await conn.execute("""
             ALTER TABLE hotel_rooms
             ADD COLUMN IF NOT EXISTS vc_id TEXT
