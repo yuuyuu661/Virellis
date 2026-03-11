@@ -346,13 +346,19 @@ class Database:
         async with self.pool.acquire() as conn:
 
             await conn.execute("""
-            INSERT INTO hotel_rooms
-            VALUES($1,$2,$3,$4,$5::timestamp)
+            INSERT INTO hotel_rooms(
+                guild_id,
+                owner_id,
+                vc_id,
+                text_id,
+                expire_at
+            )
+            VALUES($1,$2,$3,$4,$5)
             ON CONFLICT(owner_id,guild_id)
             DO UPDATE SET
                 vc_id=$3,
                 text_id=$4,
-                expire_at=$5::timestamp
+                expire_at=$5
             """,
             guild_id,
             owner_id,
