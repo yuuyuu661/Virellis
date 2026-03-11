@@ -1,36 +1,42 @@
-import aiosqlite
+import asyncpg
+import os
 from datetime import datetime
-from pathlib import Path
-
 
 class Database:
 
-    def __init__(self, db_path=None):
-        if db_path is None:
-            db_path = Path(__file__).resolve().parent / "database.db"
-        self.db_path = str(db_path)
+    def __init__(self):
+        self.pool = None
+        self.db_url = os.getenv("DATABASE_URL")
 
+        if not self.db_url:
+            raise ValueError("DATABASE_URL が設定されていません")
+
+    # =========================
+    # 初期化
+    # =========================
     async def init(self):
 
-        async with aiosqlite.connect(self.db_path) as db:
+        self.pool = await asyncpg.create_pool(self.db_url)
+
+        async with self.pool.acquire() as conn:
 
             # =========================
-            # ユーザー
+            # users
             # =========================
-            await db.execute("""
+            await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
                 user_id TEXT,
                 guild_id TEXT,
-                balance INTEGER DEFAULT 0,
+                balance BIGINT DEFAULT 0,
                 tickets INTEGER DEFAULT 0,
                 PRIMARY KEY(user_id,guild_id)
             )
             """)
 
             # =========================
-            # BOT設定
+            # settings
             # =========================
-            await db.execute("""
+            await conn.execute("""
             CREATE TABLE IF NOT EXISTS settings(
                 guild_id TEXT PRIMARY KEY,
                 admin_roles TEXT,
@@ -42,9 +48,9 @@ class Database:
             """)
 
             # =========================
-           # ホテル設定
+            # hotel_settings
             # =========================
-            await db.execute("""
+            await conn.execute("""
             CREATE TABLE IF NOT EXISTS hotel_settings(
                 guild_id TEXT PRIMARY KEY,
                 manager_role TEXT,
@@ -58,121 +64,123 @@ class Database:
             """)
 
             # =========================
-            # ホテルルーム
+            # hotel_rooms
             # =========================
-            await db.execute("""
+            await conn.execute("""
             CREATE TABLE IF NOT EXISTS hotel_rooms(
                 guild_id TEXT,
                 owner_id TEXT,
                 vc_id TEXT,
                 text_id TEXT,
-                expire_at TEXT,
+                expire_at TIMESTAMP,
                 PRIMARY KEY(owner_id,guild_id)
             )
             """)
 
-            await db.commit()
-
     # =========================
-    # ユーザー残高
+    # balance
     # =========================
     async def get_balance(self, user_id, guild_id):
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            async with db.execute(
-                "SELECT balance FROM users WHERE user_id=? AND guild_id=?",
-                (user_id, guild_id)
-            ) as cursor:
+            row = await conn.fetchrow("""
+                SELECT balance FROM users
+                WHERE user_id=$1 AND guild_id=$2
+            """, user_id, guild_id)
 
-                row = await cursor.fetchone()
+            if not row:
+                await conn.execute("""
+                    INSERT INTO users(user_id,guild_id)
+                    VALUES($1,$2)
+                """, user_id, guild_id)
+                return 0
 
-                if not row:
-                    await db.execute(
-                        "INSERT INTO users(user_id,guild_id,balance,tickets) VALUES(?,?,0,0)",
-                        (user_id, guild_id)
-                    )
-                    await db.commit()
-                    return 0
+            return row["balance"]
 
-                return row[0]
+    async def add_balance(self, user_id, guild_id, amount):
+
+        await self.get_balance(user_id, guild_id)
+
+        async with self.pool.acquire() as conn:
+
+            await conn.execute("""
+                UPDATE users
+                SET balance = balance + $1
+                WHERE user_id=$2 AND guild_id=$3
+            """, amount, user_id, guild_id)
+
+        return await self.get_balance(user_id, guild_id)
 
     async def remove_balance(self, user_id, guild_id, amount):
 
-        balance = await self.get_balance(user_id, guild_id)
+        bal = await self.get_balance(user_id, guild_id)
 
-        if balance < amount:
+        if bal < amount:
             return False
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            await db.execute(
-                "UPDATE users SET balance = balance - ? WHERE user_id=? AND guild_id=?",
-                (amount, user_id, guild_id)
-            )
-
-            await db.commit()
+            await conn.execute("""
+                UPDATE users
+                SET balance = balance - $1
+                WHERE user_id=$2 AND guild_id=$3
+            """, amount, user_id, guild_id)
 
         return True
 
     # =========================
-    # チケット
+    # tickets
     # =========================
     async def get_tickets(self, user_id, guild_id):
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            async with db.execute(
-                "SELECT tickets FROM users WHERE user_id=? AND guild_id=?",
-                (user_id, guild_id)
-            ) as cursor:
+            row = await conn.fetchrow("""
+                SELECT tickets FROM users
+                WHERE user_id=$1 AND guild_id=$2
+            """, user_id, guild_id)
 
-                row = await cursor.fetchone()
+            if not row:
+                await conn.execute("""
+                    INSERT INTO users(user_id,guild_id)
+                    VALUES($1,$2)
+                """, user_id, guild_id)
+                return 0
 
-                if not row:
-                    await db.execute(
-                        "INSERT INTO users(user_id,guild_id,balance,tickets) VALUES(?,?,0,0)",
-                        (user_id, guild_id)
-                    )
-                    await db.commit()
-                    return 0
-
-                return row[0]
+            return row["tickets"]
 
     async def add_tickets(self, user_id, guild_id, amount):
 
         await self.get_tickets(user_id, guild_id)
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            await db.execute(
-                "UPDATE users SET tickets = tickets + ? WHERE user_id=? AND guild_id=?",
-                (amount, user_id, guild_id)
-            )
-
-            await db.commit()
+            await conn.execute("""
+                UPDATE users
+                SET tickets = tickets + $1
+                WHERE user_id=$2 AND guild_id=$3
+            """, amount, user_id, guild_id)
 
         return await self.get_tickets(user_id, guild_id)
 
     async def remove_tickets(self, user_id, guild_id, amount):
 
-        tickets = await self.get_tickets(user_id, guild_id)
+        t = await self.get_tickets(user_id, guild_id)
+        new = max(t - amount, 0)
 
-        new = max(tickets - amount, 0)
+        async with self.pool.acquire() as conn:
 
-        async with aiosqlite.connect(self.db_path) as db:
-
-            await db.execute(
-                "UPDATE users SET tickets=? WHERE user_id=? AND guild_id=?",
-                (new, user_id, guild_id)
-            )
-
-            await db.commit()
+            await conn.execute("""
+                UPDATE users
+                SET tickets=$1
+                WHERE user_id=$2 AND guild_id=$3
+            """, new, user_id, guild_id)
 
         return new
 
     # =========================
-    # ホテル設定
+    # hotel_settings
     # =========================
     async def set_hotel_settings(
         self,
@@ -186,205 +194,142 @@ class Database:
         category_ids
     ):
 
-        categories = ",".join(category_ids)
+        cats = ",".join(category_ids)
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            await db.execute("""
+            await conn.execute("""
             INSERT INTO hotel_settings
-            VALUES(?,?,?,?,?,?,?,?)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8)
             ON CONFLICT(guild_id)
             DO UPDATE SET
-            manager_role=?,
-            log_channel=?,
-            sub_role=?,
-            ticket_price_1=?,
-            ticket_price_10=?,
-            ticket_price_30=?,
-            category_ids=?
-            """, (
-                guild_id,
-                manager_role,
-                log_channel,
-                sub_role,
-                price1,
-                price10,
-                price30,
-                categories,
-                manager_role,
-                log_channel,
-                sub_role,
-                price1,
-                price10,
-                price30,
-                categories
-            ))
-
-            await db.commit()
+                manager_role=$2,
+                log_channel=$3,
+                sub_role=$4,
+                ticket_price_1=$5,
+                ticket_price_10=$6,
+                ticket_price_30=$7,
+                category_ids=$8
+            """,
+            guild_id,
+            manager_role,
+            log_channel,
+            sub_role,
+            price1,
+            price10,
+            price30,
+            cats
+            )
 
     async def get_hotel_settings(self, guild_id):
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            async with db.execute(
-                "SELECT * FROM hotel_settings WHERE guild_id=?",
-                (guild_id,)
-            ) as cursor:
+            row = await conn.fetchrow("""
+                SELECT * FROM hotel_settings
+                WHERE guild_id=$1
+            """, guild_id)
 
-                row = await cursor.fetchone()
+            if not row:
+                return None
 
-                if not row:
-                    return None
-
-                return {
-                    "guild_id": row[0],
-                    "manager_role": row[1],
-                    "log_channel": row[2],
-                    "sub_role": row[3],
-                    "ticket_price_1": row[4],
-                    "ticket_price_10": row[5],
-                    "ticket_price_30": row[6],
-                    "category_ids": row[7].split(",") if row[7] else []
-                }
+            return dict(row)
 
     # =========================
-    # ルーム保存
+    # rooms
     # =========================
     async def save_room(self, guild_id, owner_id, vc_id, text_id, expire_at):
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            await db.execute("""
+            await conn.execute("""
             INSERT INTO hotel_rooms
-            VALUES(?,?,?,?,?)
+            VALUES($1,$2,$3,$4,$5)
             ON CONFLICT(owner_id,guild_id)
             DO UPDATE SET
-            vc_id=?,
-            text_id=?,
-            expire_at=?
-            """, (
-                guild_id,
-                owner_id,
-                vc_id,
-                text_id,
-                expire_at,
-                vc_id,
-                text_id,
-                expire_at
-            ))
-
-            await db.commit()
+                vc_id=$3,
+                text_id=$4,
+                expire_at=$5
+            """,
+            guild_id,
+            owner_id,
+            vc_id,
+            text_id,
+            expire_at
+            )
 
     async def get_room(self, channel_id):
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            async with db.execute(
-                "SELECT * FROM hotel_rooms WHERE text_id=? OR vc_id=?",
-                (channel_id, channel_id)
-            ) as cursor:
+            row = await conn.fetchrow("""
+                SELECT * FROM hotel_rooms
+                WHERE text_id=$1 OR vc_id=$1
+            """, channel_id)
 
-                row = await cursor.fetchone()
+            if not row:
+                return None
 
-                if not row:
-                    return None
+            return dict(row)
 
-                expire = row[4]
+    async def update_room_expire(self, vc_id, expire):
 
-                return {
-                    "guild_id": row[0],
-                    "owner_id": row[1],
-                    "vc_id": row[2],
-                    "text_id": row[3],
-                    "expire_at": datetime.fromisoformat(expire) if expire else None
-                }
+        async with self.pool.acquire() as conn:
 
-    async def get_room_by_owner(self, owner_id, guild_id):
-
-        async with aiosqlite.connect(self.db_path) as db:
-
-            async with db.execute(
-                "SELECT * FROM hotel_rooms WHERE owner_id=? AND guild_id=?",
-                (owner_id, guild_id)
-            ) as cursor:
-
-                row = await cursor.fetchone()
-
-                if not row:
-                    return None
-
-                expire = row[4]
-
-                return {
-                    "guild_id": row[0],
-                    "owner_id": row[1],
-                    "vc_id": row[2],
-                    "text_id": row[3],
-                    "expire_at": datetime.fromisoformat(expire) if expire else None
-                }
-
-    async def get_all_rooms(self):
-
-        async with aiosqlite.connect(self.db_path) as db:
-
-            async with db.execute("SELECT * FROM hotel_rooms") as cursor:
-
-                rows = await cursor.fetchall()
-
-                rooms = []
-
-                for row in rows:
-
-                    expire = row[4]
-
-                    rooms.append({
-                        "guild_id": row[0],
-                        "owner_id": row[1],
-                        "vc_id": row[2],
-                        "text_id": row[3],
-                        "expire_at": datetime.fromisoformat(expire) if expire else None
-                    })
-
-                return rooms
+            await conn.execute("""
+                UPDATE hotel_rooms
+                SET expire_at=$2
+                WHERE vc_id=$1
+            """, vc_id, expire)
 
     async def delete_room(self, owner_id, guild_id):
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            await db.execute(
-                "DELETE FROM hotel_rooms WHERE owner_id=? AND guild_id=?",
-                (owner_id, guild_id)
-            )
+            await conn.execute("""
+                DELETE FROM hotel_rooms
+                WHERE owner_id=$1 AND guild_id=$2
+            """, owner_id, guild_id)
 
-            await db.commit()
+    async def get_all_rooms(self):
+
+        async with self.pool.acquire() as conn:
+
+            rows = await conn.fetch("SELECT * FROM hotel_rooms")
+
+            return [dict(r) for r in rows]
+
+    async def get_room_by_owner(self, owner_id, guild_id):
+
+        async with self.pool.acquire() as conn:
+
+            row = await conn.fetchrow("""
+                SELECT * FROM hotel_rooms
+                WHERE owner_id=$1 AND guild_id=$2
+            """, owner_id, guild_id)
+
+            if not row:
+                return None
+
+            return dict(row)
+
     # =========================
-    # 管理者設定
+    # settings
     # =========================
     async def get_settings(self, guild_id):
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            async with db.execute(
-                "SELECT admin_roles, bank_roles, hotel_role, sub_role, currency_unit FROM settings WHERE guild_id=?",
-               (guild_id,)
-            ) as cursor:
+            row = await conn.fetchrow("""
+                SELECT * FROM settings
+                WHERE guild_id=$1
+            """, guild_id)
 
-                row = await cursor.fetchone()
+            if not row:
+                return None
 
-                if not row:
-                    return None
+            return dict(row)
 
-                return {
-                    "admin_roles": row[0].split(",") if row[0] else [],
-                    "bank_roles": row[1].split(",") if row[1] else [],
-                    "hotel_role": row[2],
-                    "sub_role": row[3],
-                    "currency_unit": row[4]
-                }
-
-    # =========================
-    # 初期設定
-    # =========================
     async def set_settings(
         self,
         guild_id,
@@ -398,57 +343,23 @@ class Database:
         admin = ",".join(admin_roles)
         bank = ",".join(bank_roles)
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self.pool.acquire() as conn:
 
-            await db.execute("""
+            await conn.execute("""
             INSERT INTO settings
-            VALUES(?,?,?,?,?,?)
+            VALUES($1,$2,$3,$4,$5,$6)
             ON CONFLICT(guild_id)
             DO UPDATE SET
-            admin_roles=?,
-            bank_roles=?,
-            hotel_role=?,
-            sub_role=?,
-            currency_unit=?
-            """, (
-                guild_id,
-                admin,
-                bank,
-                hotel_role,
-                sub_role,
-                currency_unit,
-                admin,
-                bank,
-                hotel_role,
-                sub_role,
-                currency_unit
-            ))
-
-            await db.commit()
-
-    # =========================
-    # 残高追加
-    # =========================
-    async def add_balance(self, user_id, guild_id, amount):
-
-        # ユーザー存在保証
-        await self.get_balance(user_id, guild_id)
-
-        async with aiosqlite.connect(self.db_path) as db:
-
-            await db.execute(
-                "UPDATE users SET balance = balance + ? WHERE user_id=? AND guild_id=?",
-                (amount, user_id, guild_id)
+                admin_roles=$2,
+                bank_roles=$3,
+                hotel_role=$4,
+                sub_role=$5,
+                currency_unit=$6
+            """,
+            guild_id,
+            admin,
+            bank,
+            hotel_role,
+            sub_role,
+            currency_unit
             )
-
-            await db.commit()
-
-        return await self.get_balance(user_id, guild_id)
-
-    async def update_room_expire(self, vc_id, expire):
-
-        await self._execute("""
-            UPDATE hotel_rooms
-            SET expire_at = $2
-            WHERE vc_id = $1
-        """, vc_id, expire)
