@@ -646,90 +646,75 @@ class CheckinButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-        bot = interaction.client
-        guild = interaction.guild
-        guild_id = str(guild.id)
-        user_id = str(interaction.user.id)
-
-        settings = await bot.db.get_hotel_settings(guild_id)
-        if not settings:
-            return await interaction.followup.send("ホテルが初期設定されていません。", ephemeral=True)
-
-        room = await bot.db.get_room_by_owner(user_id, guild_id)
-        if room:
-            vc = guild.get_channel(int(room["vc_id"]))
-            if vc is None:
-                await bot.db.delete_room(room["owner_id"], room["guild_id"])
-            else:
-                return await interaction.followup.send("⚠ すでにホテルルームを所持しています。", ephemeral=True)
-
-        tickets = await bot.db.get_tickets(user_id, guild_id)
-        if tickets <= 0:
-            return await interaction.followup.send("ホテルチケットがありません。", ephemeral=True)
-
-        category = await choose_category(guild, settings["category_ids"] or [])
-        if not category:
-            return await interaction.followup.send("カテゴリーが見つかりません。", ephemeral=True)
-
-        # 先にチケット消費
-        await bot.db.remove_tickets(user_id, guild_id, 1)
-
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(connect=True, view_channel=True),
-            interaction.user: discord.PermissionOverwrite(connect=True, view_channel=True, manage_channels=True),
-        }
 
         try:
+
+            await interaction.response.defer(ephemeral=True)
+
+            bot = interaction.client
+            guild = interaction.guild
+            guild_id = str(guild.id)
+            user_id = str(interaction.user.id)
+
+            settings = await bot.db.get_hotel_settings(guild_id)
+            if not settings:
+                return await interaction.followup.send("ホテルが初期設定されていません。", ephemeral=True)
+
+            room = await bot.db.get_room_by_owner(user_id, guild_id)
+            if room:
+                vc = guild.get_channel(int(room["vc_id"]))
+                if vc is None:
+                    await bot.db.delete_room(room["owner_id"], room["guild_id"])
+                else:
+                    return await interaction.followup.send("⚠ すでにホテルルームを所持しています。", ephemeral=True)
+
+            tickets = await bot.db.get_tickets(user_id, guild_id)
+           if tickets <= 0:
+                return await interaction.followup.send("ホテルチケットがありません。", ephemeral=True)
+
+            category = await choose_category(guild, settings["category_ids"] or [])
+            if not category:
+                return await interaction.followup.send("カテゴリーが見つかりません。", ephemeral=True)
+
+            await bot.db.remove_tickets(user_id, guild_id, 1)
+
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(connect=True, view_channel=True),
+                interaction.user: discord.PermissionOverwrite(connect=True, view_channel=True, manage_channels=True),
+            }
+
             vc = await guild.create_voice_channel(
                 name=f"{interaction.user.display_name}の部屋",
                 category=category,
                 overwrites=overwrites
             )
 
+            expire_at = utcnow() + timedelta(hours=24)
+
+            await bot.db.save_room(
+                guild_id,
+                user_id,
+                str(vc.id),
+                str(vc.id),
+                expire_at
+            )
+
+            await interaction.followup.send(
+                f"🏨 {vc.mention} を作成しました",
+                ephemeral=True
+            )
+
         except Exception as e:
-            print("[Hotel] VC create error:", e)
-            await bot.db.add_tickets(user_id, guild_id, 1)
-            return await interaction.followup.send("VCの作成に失敗しました。チケットは返却しました。", ephemeral=True)
 
-        expire_at = utcnow() + timedelta(hours=24)
+            print("CHECKIN ERROR:", e)
 
-        # 重要:
-        # ルーム操作は VC 内テキストで行わせるため text_id も vc.id に合わせる
-        await bot.db.save_room(
-            guild_id,
-            user_id,
-            str(vc.id),
-            str(vc.id),
-            expire_at
-        )
-
-        embed = discord.Embed(
-            title="🏨 ホテルルーム",
-            description=(
-                "この部屋は24時間で自動削除されます\n"
-                "チケットで延長できます\n\n"
-                f"期限: <t:{int(expire_at.timestamp())}:F>"
-            ),
-            color=0x2ecc71
-        )
-
-        try:
-            await vc.send(embed=embed, view=RoomView())
-        except Exception as e:
-            print("[Hotel] VC text send error:", e)
-
-        if interaction.user.voice:
             try:
-                await interaction.user.move_to(vc)
-            except Exception:
+                if interaction.response.is_done():
+                    await interaction.followup.send(f"チェックインエラー: {e}", ephemeral=True)
+                else:
+                    await interaction.response.send_message(f"チェックインエラー: {e}", ephemeral=True)
+            except:
                 pass
-
-        await interaction.followup.send(
-            f"🏨 {vc.mention} を作成しました\nVCチャットに操作パネルがあります",
-            ephemeral=True
-        )
 
         log = discord.Embed(title="🏨 ホテルチェックイン", color=0x2ecc71)
         log.add_field(name="ユーザー", value=f"{interaction.user.mention} (`{interaction.user.id}`)", inline=False)
@@ -1087,6 +1072,7 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
 
 
