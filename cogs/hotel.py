@@ -669,7 +669,7 @@ class CheckinButton(discord.ui.Button):
                     return await interaction.followup.send("⚠ すでにホテルルームを所持しています。", ephemeral=True)
 
             tickets = await bot.db.get_tickets(user_id, guild_id)
-           if tickets <= 0:
+            if tickets <= 0:
                 return await interaction.followup.send("ホテルチケットがありません。", ephemeral=True)
 
             category = await choose_category(guild, settings["category_ids"] or [])
@@ -1072,6 +1072,7 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
 
 
