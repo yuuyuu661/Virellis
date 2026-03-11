@@ -515,6 +515,12 @@ class CheckinButton(discord.ui.Button):
                 category=category,
                 overwrites=overwrites
             )
+
+            text = await guild.create_text_channel(
+                name=f"{interaction.user.display_name}-room",
+                category=category,
+                overwrites=overwrites
+            )
         except Exception as e:
             print("[Hotel] VC create error:", e)
             await bot.db.add_tickets(user_id, guild_id, 1)
@@ -911,3 +917,4 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
