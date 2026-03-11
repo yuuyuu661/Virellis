@@ -233,7 +233,10 @@ class Database:
             if not row:
                 return None
 
-            return dict(row)
+            data = dict(row)
+            data["category_ids"] = data["category_ids"].split(",") if data["category_ids"] else []
+
+            return data
 
     # =========================
     # rooms
