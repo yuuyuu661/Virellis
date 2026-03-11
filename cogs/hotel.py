@@ -287,7 +287,146 @@ class LimitButton(discord.ui.Button):
         await interaction.response.send_modal(LimitModal())
 
 
+class UnlockButton(discord.ui.Button):
+
+    def __init__(self):
+        super().__init__(
+            label="接続許可（検索）",
+            style=discord.ButtonStyle.green,
+            emoji="🔓",
+            custom_id="hotel_unlock"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        bot = interaction.client
+        guild_id = str(interaction.guild.id)
+
+        room = await bot.db.get_room(str(interaction.channel.id))
+
+        if not room:
+            return await interaction.response.send_message(
+                "ホテルルームではありません",
+                ephemeral=True
+            )
+
+        if not await can_manage_room(bot, interaction.user, guild_id, room["owner_id"]):
+            return await interaction.response.send_message(
+                "部屋の所有者または管理者のみ実行できます",
+                ephemeral=True
+            )
+
+        await interaction.response.send_modal(AllowMemberSearchModal(room))
+
+class AllowMemberSearchModal(discord.ui.Modal, title="接続許可ユーザー検索"):
+
+    keyword = discord.ui.TextInput(
+        label="ユーザーID / 名前 / ニックネーム",
+        placeholder="例: 123456 / yuu / ゆう"
+    )
+
+    def __init__(self, room):
+        super().__init__()
+        self.room = room
+
+    async def on_submit(self, interaction: discord.Interaction):
+
+        guild = interaction.guild
+        query = self.keyword.value.strip()
+
+        vc = guild.get_channel(int(self.room["vc_id"]))
+
+        if not isinstance(vc, discord.VoiceChannel):
+            return await interaction.response.send_message(
+                "VCが見つかりません",
+                ephemeral=True
+            )
+
+        candidates = []
+
+        if query.isdigit():
+            m = guild.get_member(int(query))
+            if m:
+                candidates.append(m)
+
+        q = query.lower()
+
+        for m in guild.members:
+            if q in m.name.lower() or (m.nick and q in m.nick.lower()):
+                candidates.append(m)
+
+        candidates = list({m.id: m for m in candidates}.values())
+
+        if not candidates:
+            return await interaction.response.send_message(
+                "一致するユーザーが見つかりません",
+                ephemeral=True
+            )
+
+        if len(candidates) == 1:
+
+            member = candidates[0]
+
+            ow = vc.overwrites_for(member)
+            ow.view_channel = True
+            ow.connect = True
+
+            await vc.set_permissions(member, overwrite=ow)
+
+            return await interaction.response.send_message(
+                f"✅ {member.display_name} に接続許可を付与しました",
+                ephemeral=True
+            )
+
+        view = AllowMemberSelectView(candidates, vc)
+
+        await interaction.response.send_message(
+            "ユーザーを選択してください👇",
+            view=view,
+            ephemeral=True
+        )
+
+class AllowMemberSelectView(discord.ui.View):
+
+    def __init__(self, members, vc):
+        super().__init__(timeout=20)
+        self.add_item(AllowMemberSelect(members, vc))
+
+
+class AllowMemberSelect(discord.ui.Select):
+
+    def __init__(self, members, vc):
+
+        self.vc = vc
+
+        options = [
+            discord.SelectOption(label=m.display_name, value=str(m.id))
+            for m in members
+        ]
+
+        super().__init__(
+            placeholder="ユーザーを選択",
+            options=options
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        member_id = int(self.values[0])
+        member = interaction.guild.get_member(member_id)
+
+        ow = self.vc.overwrites_for(member)
+        ow.view_channel = True
+        ow.connect = True
+
+        await self.vc.set_permissions(member, overwrite=ow)
+
+        await interaction.response.send_message(
+            f"✅ {member.display_name} に接続許可を付与しました",
+            ephemeral=True
+        )
+
 class LockButton(discord.ui.Button):
+
     def __init__(self):
         super().__init__(
             label="接続拒否",
@@ -297,65 +436,89 @@ class LockButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+
         bot = interaction.client
         guild_id = str(interaction.guild.id)
 
         room = await bot.db.get_room(str(interaction.channel.id))
+
         if not room:
-            return await interaction.response.send_message("ホテルルームではありません", ephemeral=True)
+            return await interaction.response.send_message(
+                "ホテルルームではありません",
+                ephemeral=True
+            )
 
         if not await can_manage_room(bot, interaction.user, guild_id, room["owner_id"]):
-            return await interaction.response.send_message("部屋の所有者または管理者のみ実行できます", ephemeral=True)
+            return await interaction.response.send_message(
+                "部屋の所有者または管理者のみ実行できます",
+                ephemeral=True
+            )
 
         vc = interaction.guild.get_channel(int(room["vc_id"]))
-        if not isinstance(vc, discord.VoiceChannel):
-            return await interaction.response.send_message("VCが見つかりません", ephemeral=True)
 
-        overwrite = vc.overwrites_for(interaction.guild.default_role)
-        overwrite.connect = False
+        owner_id = str(room["owner_id"])
 
-        await vc.set_permissions(interaction.guild.default_role, overwrite=overwrite)
+        allowed = [
+            m for m, perms in vc.overwrites.items()
+            if (
+                isinstance(m, discord.Member)
+                and perms.connect
+                and str(m.id) != owner_id
+                and not m.bot
+            )
+        ]
 
-        owner = interaction.guild.get_member(int(room["owner_id"]))
-        if owner:
-            owner_overwrite = vc.overwrites_for(owner)
-            owner_overwrite.connect = True
-            owner_overwrite.view_channel = True
-            await vc.set_permissions(owner, overwrite=owner_overwrite)
+        if not allowed:
+            return await interaction.response.send_message(
+                "許可済みユーザーはいません",
+                ephemeral=True
+            )
 
-        await interaction.response.send_message("🔒 接続を拒否しました", ephemeral=True)
+        view = DenySelectView(allowed, vc)
+
+        await interaction.response.send_message(
+            "拒否するユーザーを選択",
+            view=view,
+            ephemeral=True
+        )
+
+class DenySelectView(discord.ui.View):
+
+    def __init__(self, members, vc):
+        super().__init__(timeout=20)
+        self.add_item(DenySelect(members, vc))
 
 
-class UnlockButton(discord.ui.Button):
-    def __init__(self):
+class DenySelect(discord.ui.Select):
+
+    def __init__(self, members, vc):
+
+        self.vc = vc
+
+        options = [
+            discord.SelectOption(label=m.display_name, value=str(m.id))
+            for m in members
+        ]
+
         super().__init__(
-            label="接続許可",
-            style=discord.ButtonStyle.green,
-            emoji="🔓",
-            custom_id="hotel_unlock"
+            placeholder="拒否するユーザー",
+            options=options
         )
 
     async def callback(self, interaction: discord.Interaction):
-        bot = interaction.client
-        guild_id = str(interaction.guild.id)
 
-        room = await bot.db.get_room(str(interaction.channel.id))
-        if not room:
-            return await interaction.response.send_message("ホテルルームではありません", ephemeral=True)
+        member = interaction.guild.get_member(int(self.values[0]))
 
-        if not await can_manage_room(bot, interaction.user, guild_id, room["owner_id"]):
-            return await interaction.response.send_message("部屋の所有者または管理者のみ実行できます", ephemeral=True)
+        await self.vc.set_permissions(
+            member,
+            connect=False,
+            view_channel=False
+        )
 
-        vc = interaction.guild.get_channel(int(room["vc_id"]))
-        if not isinstance(vc, discord.VoiceChannel):
-            return await interaction.response.send_message("VCが見つかりません", ephemeral=True)
-
-        overwrite = vc.overwrites_for(interaction.guild.default_role)
-        overwrite.connect = None
-
-        await vc.set_permissions(interaction.guild.default_role, overwrite=overwrite)
-
-        await interaction.response.send_message("🔓 接続を許可しました", ephemeral=True)
+        await interaction.response.send_message(
+            f"🚫 {member.display_name} を拒否しました",
+            ephemeral=True
+        )
 
 
 class RenameButton(discord.ui.Button):
@@ -924,6 +1087,7 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
 
 
