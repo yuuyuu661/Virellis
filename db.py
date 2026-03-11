@@ -358,9 +358,15 @@ class Database:
         sub_role,
         currency_unit
     ):
+        if isinstance(admin_roles, str):
+            admin_roles = [admin_roles]
+
+        if isinstance(bank_roles, str):
+            bank_roles = [bank_roles]
 
         admin = ",".join(admin_roles)
         bank = ",".join(bank_roles)
+
 
         async with self.pool.acquire() as conn:
 
