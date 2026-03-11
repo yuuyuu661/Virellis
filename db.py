@@ -362,19 +362,21 @@ class Database:
         async with aiosqlite.connect(self.db_path) as db:
 
             async with db.execute(
-                "SELECT admin_roles FROM settings WHERE guild_id=?",
-                (guild_id,)
+                "SELECT admin_roles, bank_roles, hotel_role, sub_role, currency_unit FROM settings WHERE guild_id=?",
+               (guild_id,)
             ) as cursor:
 
                 row = await cursor.fetchone()
 
                 if not row:
-                    return {"admin_roles": []}
-
-                roles = row[0]
+                    return None
 
                 return {
-                    "admin_roles": roles.split(",") if roles else []
+                    "admin_roles": row[0].split(",") if row[0] else [],
+                    "bank_roles": row[1].split(",") if row[1] else [],
+                    "hotel_role": row[2],
+                    "sub_role": row[3],
+                    "currency_unit": row[4]
                 }
 
     # =========================
