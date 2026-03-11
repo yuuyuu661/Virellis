@@ -1,11 +1,14 @@
 import aiosqlite
 from datetime import datetime
+from pathlib import Path
 
 
 class Database:
 
-    def __init__(self, db_path="database.db"):
-        self.db_path = db_path
+    def __init__(self, db_path=None):
+        if db_path is None:
+            db_path = Path(__file__).resolve().parent / "database.db"
+        self.db_path = str(db_path)
 
     async def init(self):
 
