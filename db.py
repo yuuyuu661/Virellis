@@ -25,7 +25,17 @@ class Database:
             """)
 
             # =========================
-            # ホテル設定
+            # BOT設定
+            # =========================
+            await db.execute("""
+            CREATE TABLE IF NOT EXISTS settings(
+                guild_id TEXT PRIMARY KEY,
+                admin_roles TEXT
+            )
+            """)
+
+            # =========================
+           # ホテル設定
             # =========================
             await db.execute("""
             CREATE TABLE IF NOT EXISTS hotel_settings(
@@ -55,15 +65,6 @@ class Database:
             """)
 
             await db.commit()
-            # =========================
-            # BOT設定
-            # =========================
-            await db.execute("""
-            CREATE TABLE IF NOT EXISTS settings(
-                guild_id TEXT PRIMARY KEY,
-                admin_roles TEXT
-            )
-            """)
 
     # =========================
     # ユーザー残高
