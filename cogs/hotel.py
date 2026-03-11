@@ -516,11 +516,6 @@ class CheckinButton(discord.ui.Button):
                 overwrites=overwrites
             )
 
-            text = await guild.create_text_channel(
-                name=f"{interaction.user.display_name}-room",
-                category=category,
-                overwrites=overwrites
-            )
         except Exception as e:
             print("[Hotel] VC create error:", e)
             await bot.db.add_tickets(user_id, guild_id, 1)
@@ -549,7 +544,7 @@ class CheckinButton(discord.ui.Button):
         )
 
         try:
-            await text.send(embed=embed, view=RoomView())
+            await vc.send(embed=embed, view=RoomView())
         except Exception as e:
             print("[Hotel] VC text send error:", e)
 
@@ -560,7 +555,7 @@ class CheckinButton(discord.ui.Button):
                 pass
 
         await interaction.followup.send(
-            f"🏨 {vc.mention} を作成しました\n操作はこちら → {text.mention}",
+            f"🏨 {vc.mention} を作成しました\nVCチャットに操作パネルがあります",
             ephemeral=True
         )
 
@@ -920,5 +915,6 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
 
