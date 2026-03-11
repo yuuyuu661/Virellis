@@ -36,14 +36,18 @@ class InitCog(commands.Cog):
 
         guild_id = str(interaction.guild.id)
 
-        await self.bot.db.set_settings(
-            guild_id,
-            admin_roles=[str(管理者ロール.id)],
-            bank_roles=[str(銀行ロール.id)],
-            hotel_role=str(ホテルロール.id),
-            sub_role=str(サブ垢ロール.id),
-            currency_unit=通貨単位
-        )
+        try:
+            await self.bot.db.set_settings(
+                guild_id,
+                admin_roles=[str(管理者ロール.id)],
+                bank_roles=[str(銀行ロール.id)],
+                hotel_role=str(ホテルロール.id),
+                sub_role=str(サブ垢ロール.id),
+                currency_unit=通貨単位
+            )
+        except Exception as e:
+            await interaction.followup.send(f"DBエラー: {e}")
+            return
 
         embed = discord.Embed(
             title="⚙ 初期設定完了",
@@ -64,6 +68,7 @@ class InitCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(InitCog(bot))
+
 
 
 
