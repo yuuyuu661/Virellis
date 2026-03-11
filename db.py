@@ -170,6 +170,20 @@ class Database:
             ALTER TABLE hotel_rooms
             ADD COLUMN IF NOT EXISTS text_id TEXT
             """)
+            
+            await conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'hotel_rooms_pkey'
+                ) THEN
+                    ALTER TABLE hotel_rooms
+                    ADD CONSTRAINT hotel_rooms_pkey PRIMARY KEY(owner_id, guild_id);
+                END IF;
+            END $$;
+            """)
 
     # =========================
     # balance
