@@ -30,7 +30,11 @@ class Database:
             await db.execute("""
             CREATE TABLE IF NOT EXISTS settings(
                 guild_id TEXT PRIMARY KEY,
-                admin_roles TEXT
+                admin_roles TEXT,
+                bank_roles TEXT,
+                hotel_role TEXT,
+                sub_role TEXT,
+                currency_unit TEXT
             )
             """)
 
@@ -372,3 +376,43 @@ class Database:
                 return {
                     "admin_roles": roles.split(",") if roles else []
                 }
+    async def set_settings(
+        self,
+        guild_id,
+        admin_roles,
+        bank_roles,
+        hotel_role,
+        sub_role,
+        currency_unit
+    ):
+
+        admin = ",".join(admin_roles)
+        bank = ",".join(bank_roles)
+
+        async with aiosqlite.connect(self.db_path) as db:
+
+            await db.execute("""
+            INSERT INTO settings
+            VALUES(?,?,?,?,?,?)
+            ON CONFLICT(guild_id)
+            DO UPDATE SET
+            admin_roles=?,
+            bank_roles=?,
+            hotel_role=?,
+            sub_role=?,
+            currency_unit=?
+            """, (
+                guild_id,
+                admin,
+                bank,
+                hotel_role,
+                sub_role,
+                currency_unit,
+                admin,
+                bank,
+                hotel_role,
+                sub_role,
+                currency_unit
+            ))
+
+            await db.commit()
