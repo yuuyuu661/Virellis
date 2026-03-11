@@ -33,26 +33,13 @@ bot = commands.Bot(
 # =========================
 bot.db = Database()
 
-# =========================
-# Ready
-# =========================
 @bot.event
 async def on_ready():
-
     print("===== BOT START =====")
-
     print(f"Logged in as {bot.user}")
 
-    # DB初期化
-    await bot.db.init()
-
-    print("Database Ready")
-
-    # Slash同期
     guild = discord.Object(id=GUILD_ID)
-
     synced = await bot.tree.sync(guild=guild)
-
     print(f"Slash synced : {len(synced)} commands")
 
 # =========================
@@ -82,10 +69,10 @@ async def load_cogs():
 # =========================
 async def main():
 
+    await bot.db.init()
+
     async with bot:
-
         await load_cogs()
-
         await bot.start(TOKEN)
 
 # =========================
@@ -93,6 +80,7 @@ async def main():
 # =========================
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
