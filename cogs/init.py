@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 
 
-OWNER_ID = 969739156756508672
+OWNER_ID = 716667546241335328
 
 
 class InitCog(commands.Cog):
@@ -84,4 +84,5 @@ class InitCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(InitCog(bot))
+
 
