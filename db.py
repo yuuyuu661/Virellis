@@ -144,17 +144,16 @@ class Database:
 
         async with self.pool.acquire() as conn:
 
+            await conn.execute("""
+                INSERT INTO users(user_id,guild_id)
+                VALUES($1,$2)
+                ON CONFLICT(user_id,guild_id) DO NOTHING
+            """, user_id, guild_id)
+
             row = await conn.fetchrow("""
                 SELECT balance FROM users
                 WHERE user_id=$1 AND guild_id=$2
             """, user_id, guild_id)
-
-            if not row:
-                await conn.execute("""
-                    INSERT INTO users(user_id,guild_id)
-                    VALUES($1,$2)
-                """, user_id, guild_id)
-                return 0
 
             return row["balance"]
 
@@ -196,17 +195,16 @@ class Database:
 
         async with self.pool.acquire() as conn:
 
+            await conn.execute("""
+                INSERT INTO users(user_id,guild_id)
+                VALUES($1,$2)
+                ON CONFLICT(user_id,guild_id) DO NOTHING
+            """, user_id, guild_id)
+
             row = await conn.fetchrow("""
                 SELECT tickets FROM users
                 WHERE user_id=$1 AND guild_id=$2
             """, user_id, guild_id)
-
-            if not row:
-                await conn.execute("""
-                    INSERT INTO users(user_id,guild_id)
-                    VALUES($1,$2)
-                """, user_id, guild_id)
-                return 0
 
             return row["tickets"]
 
