@@ -662,11 +662,18 @@ class CheckinButton(discord.ui.Button):
 
             room = await bot.db.get_room_by_owner(user_id, guild_id)
             if room:
-                vc = guild.get_channel(int(room["vc_id"]))
-                if vc is None:
+
+                if not room.get("vc_id"):
                     await bot.db.delete_room(room["owner_id"], room["guild_id"])
                 else:
-                    return await interaction.followup.send("⚠ すでにホテルルームを所持しています。", ephemeral=True)
+                   vc = guild.get_channel(int(room["vc_id"]))
+                    if vc is None:
+                        await bot.db.delete_room(room["owner_id"], room["guild_id"])
+                    else:
+                        return await interaction.followup.send(
+                            "⚠ すでにホテルルームを所持しています。",
+                            ephemeral=True
+                        )
 
             tickets = await bot.db.get_tickets(user_id, guild_id)
             if tickets <= 0:
@@ -1072,6 +1079,7 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
 
 
