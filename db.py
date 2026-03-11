@@ -296,7 +296,16 @@ class Database:
                 return None
 
             data = dict(row)
-            data["category_ids"] = data["category_ids"].split(",") if data["category_ids"] else []
+
+            # 🔥 category_ids 安全変換
+            raw = data.get("category_ids")
+
+            if not raw:
+                data["category_ids"] = []
+            else:
+                raw = str(raw)
+                raw = raw.replace("{", "").replace("}", "").replace('"', "").replace("[", "").replace("]", "")
+                data["category_ids"] = [x.strip() for x in raw.split(",") if x.strip()]
 
             return data
 
