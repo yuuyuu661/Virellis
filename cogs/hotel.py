@@ -157,39 +157,48 @@ class ExtendButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+
         bot = interaction.client
         guild_id = str(interaction.guild.id)
         user_id = str(interaction.user.id)
 
         room = await bot.db.get_room(str(interaction.channel.id))
         if not room:
-            return await interaction.response.send_message("このチャンネルはホテルではありません", ephemeral=True)
+            return await interaction.response.send_message(
+                "このチャンネルはホテルではありません",
+                ephemeral=True
+            )
 
         if not await can_manage_room(bot, interaction.user, guild_id, room["owner_id"]):
-            return await interaction.response.send_message("部屋の所有者または管理者のみ延長できます", ephemeral=True)
+            return await interaction.response.send_message(
+                "部屋の所有者または管理者のみ延長できます",
+                ephemeral=True
+            )
 
         tickets = await bot.db.get_tickets(user_id, guild_id)
-        if tickets <= 0:
-            return await interaction.response.send_message("チケットがありません", ephemeral=True)
 
+        if tickets <= 0:
+            return await interaction.response.send_message(
+                "チケットがありません",
+                ephemeral=True
+            )
+
+        # チケット消費
         await bot.db.remove_tickets(user_id, guild_id, 1)
 
         expire = room["expire_at"] or utcnow()
         new_expire = expire + timedelta(hours=24)
 
-        await bot.db.save_room(
-            guild_id,
-            user_id,
-            str(vc.id),
-            str(text.id),
-            expire_at
+        # 期限更新
+        await bot.db.update_room_expire(
+            str(interaction.channel.id),
+            new_expire
         )
 
         await interaction.response.send_message(
             f"🏨 24時間延長しました\n新しい期限: <t:{int(new_expire.timestamp())}:F>",
             ephemeral=True
         )
-
 
 class TimeButton(discord.ui.Button):
     def __init__(self):
@@ -915,6 +924,7 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
 
 
