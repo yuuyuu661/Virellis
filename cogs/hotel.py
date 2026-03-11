@@ -666,7 +666,7 @@ class CheckinButton(discord.ui.Button):
                 if not room.get("vc_id"):
                     await bot.db.delete_room(room["owner_id"], room["guild_id"])
                 else:
-                   vc = guild.get_channel(int(room["vc_id"]))
+                    vc = guild.get_channel(int(room["vc_id"]))
                     if vc is None:
                         await bot.db.delete_room(room["owner_id"], room["guild_id"])
                     else:
@@ -1079,6 +1079,7 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
 
 
