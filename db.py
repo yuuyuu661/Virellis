@@ -16,7 +16,16 @@ class Database:
     # =========================
     async def init(self):
 
-        self.pool = await asyncpg.create_pool(self.db_url)
+        print("DB connecting...")
+
+        self.pool = await asyncpg.create_pool(
+            self.db_url,
+            min_size=1,
+            max_size=5,
+            command_timeout=10
+        )
+
+        print("DB connected")
 
         async with self.pool.acquire() as conn:
 
