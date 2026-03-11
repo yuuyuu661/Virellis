@@ -144,7 +144,7 @@ class Database:
             # 🔥 ここに入れる
             try:
                 col_type = await conn.fetchval("""
-                    SELECT data_type
+                    SELECT udt_name
                     FROM information_schema.columns
                     WHERE table_name='hotel_rooms'
                     AND column_name='expire_at'
@@ -157,6 +157,7 @@ class Database:
                         USING expire_at::timestamp
                     """)
                     print("[DB MIGRATION] hotel_rooms.expire_at TEXT → TIMESTAMP")
+
             except Exception as e:
                 print("[DB MIGRATION ERROR expire_at]", e)
 
