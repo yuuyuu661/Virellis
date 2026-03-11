@@ -26,6 +26,7 @@ class InitCog(commands.Cog):
         サブ垢ロール: discord.Role,
         通貨単位: str
     ):
+        await interaction.response.defer(ephemeral=True)
 
         # 実行者チェック
         if interaction.user.id != OWNER_ID:
@@ -75,7 +76,7 @@ class InitCog(commands.Cog):
             inline=False
         )
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
 
 # =========================
@@ -84,5 +85,6 @@ class InitCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(InitCog(bot))
+
 
 
