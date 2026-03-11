@@ -103,6 +103,26 @@ class Database:
             )
             """)
 
+            # 🔥 migration（ARRAY → TEXT）
+            try:
+                col_type = await conn.fetchval("""
+                    SELECT data_type
+                    FROM information_schema.columns
+                    WHERE table_name='hotel_settings'
+                    AND column_name='category_ids'
+                """)
+
+                if col_type == "ARRAY":
+                    await conn.execute("""
+                        ALTER TABLE hotel_settings
+                        ALTER COLUMN category_ids TYPE TEXT
+                        USING array_to_string(category_ids, ',')
+                    """)
+                    print("[DB MIGRATION] hotel_settings.category_ids ARRAY → TEXT 完了")
+
+            except Exception as e:
+                print("[DB MIGRATION ERROR]", e)
+
             # =========================
             # hotel_rooms
             # =========================
