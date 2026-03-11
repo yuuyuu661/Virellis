@@ -44,7 +44,7 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
 
     # DB初期化
-    await bot.db.init_db()
+    await bot.db.init()
 
     print("Database Ready")
 
@@ -93,5 +93,6 @@ async def main():
 # =========================
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
