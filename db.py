@@ -321,14 +321,21 @@ class Database:
         async with self.pool.acquire() as conn:
 
             row = await conn.fetchrow("""
-                SELECT * FROM settings
+                SELECT admin_roles, bank_roles, hotel_role, sub_role, currency_unit
+                FROM settings
                 WHERE guild_id=$1
             """, guild_id)
 
             if not row:
                 return None
 
-            return dict(row)
+            return {
+                "admin_roles": row["admin_roles"].split(",") if row["admin_roles"] else [],
+                "bank_roles": row["bank_roles"].split(",") if row["bank_roles"] else [],
+                "hotel_role": row["hotel_role"],
+                "sub_role": row["sub_role"],
+                "currency_unit": row["currency_unit"] or ""
+            }
 
     async def set_settings(
         self,
