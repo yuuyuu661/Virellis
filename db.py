@@ -142,6 +142,11 @@ class Database:
             """)
             await conn.execute("""
             ALTER TABLE hotel_rooms
+            ADD COLUMN IF NOT EXISTS vc_id TEXT
+            """)
+
+            await conn.execute("""
+            ALTER TABLE hotel_rooms
             ADD COLUMN IF NOT EXISTS text_id TEXT
             """)
 
