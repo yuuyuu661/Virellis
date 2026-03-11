@@ -178,11 +178,11 @@ class ExtendButton(discord.ui.Button):
         new_expire = expire + timedelta(hours=24)
 
         await bot.db.save_room(
-            room["guild_id"],
-            room["owner_id"],
-            room["vc_id"],
-            room["text_id"],
-            new_expire
+            guild_id,
+            user_id,
+            str(vc.id),
+            str(text.id),
+            expire_at
         )
 
         await interaction.response.send_message(
@@ -549,7 +549,7 @@ class CheckinButton(discord.ui.Button):
         )
 
         try:
-            await vc.send(embed=embed, view=RoomView())
+            await text.send(embed=embed, view=RoomView())
         except Exception as e:
             print("[Hotel] VC text send error:", e)
 
@@ -559,7 +559,10 @@ class CheckinButton(discord.ui.Button):
             except Exception:
                 pass
 
-        await interaction.followup.send(f"🏨 {vc.mention} を作成しました", ephemeral=True)
+        await interaction.followup.send(
+            f"🏨 {vc.mention} を作成しました\n操作はこちら → {text.mention}",
+            ephemeral=True
+        )
 
         log = discord.Embed(title="🏨 ホテルチェックイン", color=0x2ecc71)
         log.add_field(name="ユーザー", value=f"{interaction.user.mention} (`{interaction.user.id}`)", inline=False)
@@ -917,4 +920,5 @@ class HotelCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(HotelCog(bot))
+
 
