@@ -347,12 +347,12 @@ class Database:
 
             await conn.execute("""
             INSERT INTO hotel_rooms
-            VALUES($1,$2,$3,$4,$5)
+            VALUES($1,$2,$3,$4,$5::timestamp)
             ON CONFLICT(owner_id,guild_id)
             DO UPDATE SET
                 vc_id=$3,
                 text_id=$4,
-                expire_at=$5
+                expire_at=$5::timestamp
             """,
             guild_id,
             owner_id,
