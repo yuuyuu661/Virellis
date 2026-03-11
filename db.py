@@ -376,6 +376,10 @@ class Database:
                 return {
                     "admin_roles": roles.split(",") if roles else []
                 }
+
+    # =========================
+    # 初期設定
+    # =========================
     async def set_settings(
         self,
         guild_id,
@@ -416,3 +420,22 @@ class Database:
             ))
 
             await db.commit()
+
+    # =========================
+    # 残高追加
+    # =========================
+    async def add_balance(self, user_id, guild_id, amount):
+
+        # ユーザー存在保証
+        await self.get_balance(user_id, guild_id)
+
+        async with aiosqlite.connect(self.db_path) as db:
+
+            await db.execute(
+                "UPDATE users SET balance = balance + ? WHERE user_id=? AND guild_id=?",
+                (amount, user_id, guild_id)
+            )
+
+            await db.commit()
+
+        return await self.get_balance(user_id, guild_id)
