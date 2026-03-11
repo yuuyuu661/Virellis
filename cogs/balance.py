@@ -33,6 +33,7 @@ class BalanceCog(commands.Cog):
         if user != interaction.user:
 
             settings = await self.bot.db.get_settings(guild_id)
+            unit = settings.get("currency_unit","") if settings else ""
 
             admin_roles = settings["admin_roles"] if settings else []
 
